@@ -18,7 +18,7 @@ A arquitetura da aplicação se trata de uma hibridização entre as arquitetura
 ESTRUTURA PADRÃO DE CADA MÉTODO
 
 <details>
-<summary><b>MÉTODO ENDPOINT - DESC</b> </summary>
+<summary><b>MÉTODO ENDPOINT</b> - DESC </summary>
 
 - **Descrição:**
 - **Parâmetros de Caminho:**
@@ -58,6 +58,84 @@ ESTRUTURA PADRÃO DE CADA MÉTODO
 </details>
 
 -->
+
+<details>
+<summary><b>POST /users</b> - Cria um usuário </summary>
+
+- **Descrição:** Adiciona um novo usuário na base de dados do sistema
+- **Headers:**
+    - `Content-Type:` multipart/form-data
+- **Body:**
+    - `username` (string, required): o apelido único do usuário
+    - `name` (string, required): o nome do usuário (não-único)
+    - `email` (string, required): o email do usuário
+    - `password` (string, required): a senha do usuário
+    - `pfp` (file, optional): a foto de perfil do usuário (png, jpg, jpeg, webp)
+- **Exemplo-Body:**
+    ```
+    ------SomeBoundary
+    Content-Disposition: form-data; name="username"
+
+    example_username
+    ------SomeBoundary
+    Content-Disposition: form-data; name="name"
+
+    Nome de Exemplo
+    ------SomeBoundary
+    Content-Disposition: form-data; name="email"
+
+    my@example.com
+    ------SomeBoundary
+    Content-Disposition: form-data; name="password"
+
+    123456789
+    ------SomeBoundary
+    Content-Disposition: form-data; name="pfp"; filename="perfil.webp"
+    Content-Type: image/webp
+
+    (binary image content)
+    ------SomeBoundary--
+
+    ```
+- **Response:**
+    - `uuid` (string): o id público do usuário criado
+    - `pfp_url` (string): a url do local onde a foto de perfil foi criada
+    - `created_at` (string): o horário de criação do usuário
+    - `access_token` (string): um token JWT de acesso de curta duração
+    - `refresh_token` (string): um token de refrescamento do token de acesso de longa duração e rotativo
+    - `message` (string): uma mensagem detalhando o resultado da requisição
+- **Códigos:**
+    - `201` Created - Usuário criado com sucesso
+    - `400` Bad Request - Erro de validação (Campo obrigatório não-preenchido ou inválido)
+    - `409` Conflict - Já existe um usuário com o mesmo `username`
+- **Exemplo-Response: [201 Created]**
+    ```json
+    {
+        "uuid": "e52dd592-2b42-48ae-a9fd-8c8e9372b982",
+        "pfp_url": "https://cdn.conchat.app/pfp/e7823sc6.webp",
+        "created_at": "2025-11-21T17:35:20Z",
+        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1dWlkIjoiZTUyZGQ1OTItMmI0Mi00OGFlLWE5ZmQtOGM4ZTkzNzJiOTgyIiwiaGkiOiJ5b3UgYWN0dWFsbHkgZGVjb2RlZCB0aGlzLCB5b3UncmUgYSBjdXJpb3VzIG9uZSIsIm1lc3NhZ2VfdG9fdGhlX3dvcmxkIjoiYmUga2luZCwgd2UgYWxsIGRlc2VydmUgYSBsaXR0bGUgbG92ZSA6KSIsImV4cCI6MTcyOTU3MTcyMCwiaWF0IjoxNzI5NTcxMTIwfQ.0_z5gGK4tqktc-IuHX35c9BoCAy76L7f7NWWKbwi8FE",
+        "refresh_token": "e1f27a57-19df-4d3e-9792-a32ec13400f3",
+        "message": "User was created sucessfully"
+    }
+    ```
+- **Exemplo-Response: [400 Bad Request]**
+    ```json
+    {
+        "message": "'username' field must be provided!",
+    }
+    ```
+- **Exemplo-Response: [409 Conflict]**
+    ```json
+    {
+        "message": "Username 'example_username' is already taken",
+    }
+    ```
+- **OBS.:**
+    - `username` e `email` são campos únicos, e portanto não podem se repetir entre usuários
+
+
+</details>
 
 # Arquitetura Pub/Sub
 
