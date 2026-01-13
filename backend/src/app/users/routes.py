@@ -88,10 +88,10 @@ def create_user():
         
         new_user = User(
             username=username,
-            name=name, 
+            name=name,
             email=email,
             password=hashed_password,
-            profile_picture=pfp_filename
+            pfp=pfp_filename
         )
         
         db.session.add(new_user)

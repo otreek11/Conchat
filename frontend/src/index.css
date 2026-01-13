@@ -11,6 +11,50 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Paleta Ciano e Azul Petróleo */
+  --primary-cyan: #00CED1;
+  --primary-cyan-hover: #00B8BA;
+  --primary-cyan-light: #7FFFD4;
+
+  --secondary-teal: #008B8B;
+  --secondary-teal-hover: #006B6B;
+  --secondary-teal-dark: #004B4B;
+
+  --accent-cyan: #E0FFFF;
+  --accent-teal: #AFEEEE;
+
+  /* Cores de status */
+  --error-color: #FF6B6B;
+  --error-bg: #FFF5F5;
+  --error-border: #FFE0E0;
+
+  --success-color: #51CF66;
+  --success-bg: #F0FFF4;
+  --success-border: #C6F6D5;
+
+  --warning-color: #FFD43B;
+
+  /* Cores neutras */
+  --text-primary: #2C3E50;
+  --text-secondary: #6C757D;
+  --border-color: #DEE2E6;
+  --bg-light: #F8F9FA;
+  --white: #FFFFFF;
+
+  /* Força da senha */
+  --strength-weak: #FF6B6B;
+  --strength-medium: #FFD43B;
+  --strength-strong: #51CF66;
+
+  /* Sombras */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+
+  /* Transições */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.3s ease;
 }
 
 a {
