@@ -6,19 +6,20 @@ from argon2.exceptions import VerifyMismatchError
 from schema import *
 from flask import jsonify, request
 from functools import wraps
+from logger import logger
 
 load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
-ACCESS_EXP = timedelta(hours=1) # Token de acesso dura 1 hora
-REFRESH_EXP = timedelta(days=30) # 30 dias de inatividade
+ACCESS_EXP = timedelta(minutes=15)
+REFRESH_EXP = timedelta(days=20)
 
 hasher = PasswordHasher()
-
 
 # Decorador
 def require_auth(role = None):
     def dec(func):
+        logger.info(f"Using real authenticator on function: {func}")
         @wraps(func)
         def wrapper(*args, **kwargs):
             auth = request.headers.get("Authorization")
@@ -30,7 +31,7 @@ def require_auth(role = None):
                 return jsonify({"message": "Malformed authorization header"}), 400
 
             token = parts[1]
-            payload = decodeJWT(token)
+            payload = decode_jwt(token)
             if payload is None: # Token invalido/expirado
                 return jsonify({"message": "Token is invalid/expired"}), 401
             
@@ -43,13 +44,12 @@ def require_auth(role = None):
     return dec
             
 def fakeRequireAuth(role=None):
-    print("Using fake authenticator")
     def dec(func):
+        logger.info(f"Using fake authenticator on function: {func}")
         @wraps(func)
         def wrapper(*args, **kwargs):
             payload = {
-                "user_code": 0,
-                "user_id": "this user is not real",
+                "sub": "this user is not real",
                 "exp": datetime.now(tz=timezone.utc) + REFRESH_EXP, # dura muito tempo
                 "role": "admin"
             }
@@ -63,7 +63,7 @@ def fakeRequireAuth(role=None):
 # JWT ------------------------------------------------------------------------------------------------------------------
 def gen_jwt(user_id, role):
     payload = {
-        "sub": user_id,
+        "sub": str(user_id),
         "role": role,
         "exp": datetime.now(tz=timezone.utc) + ACCESS_EXP
     }
@@ -128,16 +128,17 @@ def validate_refresh_token(token):
             db.session.commit()
         except:
             db.session.rollback()
-            return jsonify({"message": "The specified token has an invalid hash, but we were not able to invalidate it"}), 500
-        return jsonify({"message": "O Token apresentado tem hash inválido"}), 401
+            logger.error(f"There was an attempt to use a token with invalid hash, but we could not invalidate it: {tok_id}")
+            return jsonify({"message": "The specified token has an invalid hash"}), 500
+        return jsonify({"message": "The specified token has an invalid hash"}), 401
     
     # Válido
-    newSecretTok = secrets.token_urlsafe(64)
-    newHash = hasher.hash(newSecretTok)
-    newExpires = datetime.now(timezone.utc) + REFRESH_EXP
+    new_token_sec = secrets.token_urlsafe(64)
+    new_hash = hasher.hash(new_token_sec)
+    new_expires = datetime.now(timezone.utc) + REFRESH_EXP
 
-    db_token.TokenHash = newHash
-    db_token.ExpiraEm = newExpires
+    db_token.token_hash = new_hash
+    db_token.expires_at = new_expires
 
 
     try:
@@ -145,33 +146,28 @@ def validate_refresh_token(token):
     except:
         return jsonify({"message": "Não foi possível salvar o token validado"}), 500
     
-    role = "client"
-    
-    admin = db.session.query(Admin).filter_by(CodAdmin = db_token.CodUsuario).first()
-    if admin: role = "admin"
-    else:
-        seller = db.session.query(Vendedor).filter_by(CodVendedor = db_token.CodUsuario).first()
-        if seller: role = "seller"
-    
-    user = db.session.query(Usuario).filter_by(CodUsuario = db_token.CodUsuario).first()
+    role = "default"
 
+    user = db.session.get(User, db_token.user_id)
+    if user.admin_profile:
+        role = 'admin'
 
     return jsonify({
         "message": "Token é válido e foi atualizado com sucesso",
-        "refresh_token": f"{codTok}.{newSecretTok}",
-        "access_token": genJWT(user.UsuarioUUID, user.CodUsuario, role)
+        "refresh_token": f"{tok_id}.{new_token_sec}",
+        "access_token": gen_jwt(user.id, role)
     }), 200
 
-def cleanupExpiredTokens():
+def cleanup_expired_tokens():
     now = datetime.now(timezone.utc)
-    tokens = db.session.query(RefreshToken).filter(RefreshToken.ExpiraEm < now).all()
 
-    for token in tokens:
-        db.session.delete(token)
+    deleted_count = db.session.query(RefreshToken).filter(RefreshToken.expires_at < now).delete()
 
     try:
         db.session.commit()
     except:
+        db.session.rollback()
         return False
     
+    logger.info(f"Deleted {deleted_count} expired tokens")
     return True
