@@ -2,7 +2,7 @@ import os, uuid
 
 from flask import Flask, Blueprint, request, jsonify
 from dotenv import load_dotenv
-from schema import *
+from ..schema import *
 
 base_bp = Blueprint("Base API Blueprint", __name__, url_prefix="/api/v1")
 
@@ -17,9 +17,9 @@ def init_app():
     db.init_app(app)
     migrate.init_app(app, db)
 
-    from app.auth import auth_bp
-    from app.users import users_bp
-    from app.admins import admins_bp
+    from .auth import auth_bp
+    from .users import users_bp
+    from .admins import admins_bp
 
     base_bp.register_blueprint(auth_bp)
     base_bp.register_blueprint(users_bp)
