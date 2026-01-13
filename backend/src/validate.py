@@ -39,7 +39,7 @@ def require_auth(role = None):
             if role is not None and user_role != role:
                 return jsonify({"message": "The specified user is not allowed to perform such action"}), 403
             
-            return func(*args, tokenPayload=payload, **kwargs)
+            return func(*args, token_payload=payload, **kwargs)
         return wrapper
     return dec
             
