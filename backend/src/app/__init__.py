@@ -18,9 +18,9 @@ def init_app():
     db.init_app(app)
     migrate.init_app(app, db)
 
-    from app.auth import auth_bp
-    from app.users import users_bp
-    from app.admins import admins_bp
+    from .auth import auth_bp
+    from .users import users_bp
+    from .admins import admins_bp
 
     base_bp.register_blueprint(auth_bp)
     base_bp.register_blueprint(users_bp)
