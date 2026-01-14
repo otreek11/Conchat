@@ -27,6 +27,8 @@ RUN pip install --upgrade pip setuptools wheel \
 # Copy application code
 COPY . .
 
+ENV PYTHONPATH=/app/src
+
 ENV FLASK_APP=src/app.py
 ENV FLASK_ENVIRONMENT=production
 

@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from .schema import *
+from schema import *
 from flask import jsonify, request
 from functools import wraps
 from logger import logger
