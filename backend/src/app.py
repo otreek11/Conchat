@@ -1,5 +1,5 @@
-from .app import *
-from .logger import logger
+from app import *
+from logger import logger
 
 @base_bp.route("/")
 def index():

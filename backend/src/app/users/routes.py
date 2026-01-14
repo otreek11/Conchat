@@ -1,15 +1,15 @@
 from flask import Flask, Blueprint, request, jsonify
-from ...validate import *
-from ...schema import *
-from ...logger import logger
+from validate import *
+from schema import *
+from logger import logger
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, or_, and_
 from ...filehandling import *
 from werkzeug.utils import secure_filename
 
-users_bp = Blueprint("Users Blueprint", __name__, url_prefix='/user')
+users_bp = Blueprint("Users Blueprint", __name__, url_prefix='/users')
 
-@users_bp.route("/users", methods=["GET"])
+@users_bp.route("/", methods=["GET"])
 @require_auth()
 def search_users(token_payload):
     q = request.args.get('q')
@@ -52,7 +52,7 @@ def search_users(token_payload):
         "message": f"{len(users_list)} users found!"
     }), 200
 
-@users_bp.route("/users", methods=["POST"])
+@users_bp.route("/", methods=["POST"])
 def create_user():
     username = request.form.get("username")
     name = request.form.get("name")
@@ -121,4 +121,158 @@ def create_user():
 
         delete_file(pfp_path)
 
+        return jsonify({"message": "Internal server error"}), 500
+
+
+@users_bp.route('/<username>', methods=['GET'])
+@require_auth()
+def get_user_by_username(username, token_payload):
+    user = db.session.query(User).filter_by(username=username).first()
+
+    if not user:
+        return jsonify({
+            "message": f"Could not find user '{username}'"
+        }), 404
+
+    response_data = {
+        "uuid": user.uuid,
+        "name": user.name,
+        "created_at": user.created_at.isoformat(),
+        "pfp_url": user.pfp,
+        "email": user.email,
+        "message": f"User {username} was found"
+    }
+
+    requested_fields = request.args.get('fields')
+    
+    if requested_fields:
+        fields_list = [f.strip() for f in requested_fields.split(',')]
+        
+        filtered_response = {
+            k: v for k, v in response_data.items() if k in fields_list
+        }
+
+        if filtered_response:
+            return jsonify(filtered_response), 200
+
+    return jsonify(response_data), 200
+
+@users_bp.route("/<id>", methods=["DELETE"])
+@require_auth()
+def delete_user(id, token_payload):
+    try:
+        user = db.session.get(User, id)
+        if not user:
+            return jsonify({"message": "User not found"}), 404
+
+        requester_id = token_payload.get("sub")
+        requester_role = token_payload.get("role")
+
+        if requester_role != "admin" and requester_id != id:
+            return jsonify({"message": "Forbidden"}), 403
+
+        db.session.delete(user)
+        db.session.commit()
+
+        logger.info(f"User removed: {id}")
+        return jsonify({"message": "User removed"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error while deleting user {id}: {str(e)}")
+        return jsonify({"message": "Internal server error"}), 500
+
+@users_bp.route("/<id>", methods=["PATCH"])
+@require_auth()
+def update_user(id, token_payload):
+    pfp_path = None
+    try:
+        user = db.session.get(User, id)
+        if not user:
+            return jsonify({"message": "User not found"}), 404
+
+        requester_id = token_payload.get("sub")
+        requester_role = token_payload.get("role")
+
+        if requester_role != "admin" and requester_id != id:
+            return jsonify({"message": "Forbidden"}), 403
+
+        username = request.form.get("username")
+        name = request.form.get("name")
+        email = request.form.get("email")
+        password = request.form.get("password")
+        pfp_file = request.files.get("pfp")
+
+        if not any([username, name, email, password, pfp_file]):
+            return jsonify({"message": "No fields provided"}), 400
+
+        if password:
+            if len(password) < 8:
+                return jsonify({"message": "Password too short"}), 400
+
+        filters = []
+        if username:
+            filters.append(User.username == username)
+        if email:
+            filters.append(User.email == email)
+
+        if filters:
+            stmt = select(User).where(
+                and_(
+                    User.id != user.id,
+                    or_(*filters)
+                )
+            )
+
+            existing_user = db.session.execute(stmt).scalar_one_or_none()
+            if existing_user:
+                msg = f"Username '{username}' taken" if username and existing_user.username == username else f"Email '{email}' taken"
+                return jsonify({"message": msg}), 409
+
+        if username is not None:
+            user.username = username
+
+        if name is not None:
+            user.name = name
+
+        if email is not None:
+            user.email = email
+
+        if password:
+            user.password = hasher.hash(password)
+
+        old_pfp_path = None
+        if pfp_file:
+            if not allowed_file(pfp_file.filename):
+                return jsonify({"message": "Invalid file type"}), 400
+
+            pfp_filename, pfp_path = save_file(pfp_file, UPLOAD_FOLDER)
+
+            if user.pfp:
+                old_pfp_path = os.path.join(UPLOAD_FOLDER, user.pfp)
+
+            user.pfp = pfp_filename
+
+        db.session.commit()
+
+        if old_pfp_path:
+            delete_file(old_pfp_path)
+
+        final_pfp_url = f"{CDN_BASE_URL}{user.pfp}" if user.pfp else None
+
+        logger.info(f"User updated: {id}")
+
+        return jsonify({
+            "uuid": str(user.id),
+            "pfp_url": final_pfp_url,
+            "message": "User updated successfully"
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+
+        if pfp_path:
+            delete_file(pfp_path)
+
+        logger.error(f"Error while updating user {id}: {str(e)}")
         return jsonify({"message": "Internal server error"}), 500

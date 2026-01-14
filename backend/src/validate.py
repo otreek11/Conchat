@@ -6,7 +6,7 @@ from argon2.exceptions import VerifyMismatchError
 from schema import *
 from flask import jsonify, request
 from functools import wraps
-from .logger import logger
+from logger import logger
 
 load_dotenv()
 
