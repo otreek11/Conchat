@@ -585,7 +585,6 @@ ESTRUTURA PADRÃO DE CADA MÉTODO
     - O campo `registered_at` é definido automaticamente pelo servidor no momento da criação
     - O usuário autenticado que cria o grupo pode ser automaticamente associado como membro/administrador do grupo
 
-
 </details>
 
 <details>
@@ -788,6 +787,83 @@ ESTRUTURA PADRÃO DE CADA MÉTODO
 </details>
 
 <details>
+<summary><b>GET /groups/{id}/members</b> - Lista os membros de um grupo</summary>
+
+- **Descrição:** Retorna a lista de todos os usuários pertencentes a um grupo, incluindo seus papéis (`role`) dentro dele.
+
+- **Regras de Permissão:**  
+    - O **owner** pode listar todos os membros  
+    - O **admin** pode listar todos os membros  
+    - Um **member** pode listar todos os membros  
+    - Usuários que **não pertencem ao grupo** não podem acessar este recurso  
+
+- **Headers:**
+    - `Authorization:` Bearer `<token>`
+
+- **Parâmetros de Caminho:**
+    - `id` (string, required): o identificador único do grupo  
+
+- **Query Params (opcional):**
+    - `role` (string, optional): filtra membros por papel  
+        - Valores aceitos: `owner`, `admin`, `member`  
+
+- **Response:**
+    - `group_id` (string): o id do grupo  
+    - `members` (array): lista de membros do grupo  
+        - `user_id` (string): id do usuário  
+        - `role` (string): papel do usuário no grupo  
+
+- **Códigos:**
+    - `200` OK - Lista de membros retornada com sucesso  
+    - `401` Unauthorized - Token de autenticação ausente, inválido ou expirado  
+    - `403` Forbidden - Usuário autenticado não pertence ao grupo  
+    - `404` Not Found - Grupo não encontrado  
+    - `500` Internal Server Error - Erro interno ao buscar os membros  
+
+- **Exemplo-Response: [200 OK]**
+    ```json
+    {
+        "group_id": "a3b6f5c2-0f3e-4b9d-9d1b-1c9c9f5b8a21",
+        "members": [
+            {
+                "user_id": "e52dd592-2b42-48ae-a9fd-8c8e9372b982",
+                "role": "owner"
+            },
+            {
+                "user_id": "a7f2b3c1-9d8e-4c4f-9b7a-3c12f54eab10",
+                "role": "admin"
+            },
+            {
+                "user_id": "b92a1c43-2f6d-4b89-90f3-8a1c92de11aa",
+                "role": "member"
+            }
+        ]
+    }
+    ```
+
+- **Exemplo-Response: [403 Forbidden]**
+    ```json
+    {
+        "message": "You are not a member of this group"
+    }
+    ```
+
+- **Exemplo-Response: [404 Not Found]**
+    ```json
+    {
+        "message": "Group not found"
+    }
+    ```
+
+- **OBS.:**
+    - Apenas usuários que **pertencem ao grupo** podem listar seus membros.
+    - O papel (`role`) indica o nível de permissão do usuário dentro do grupo.
+    - O resultado pode ser filtrado por papel usando o parâmetro `role`.
+    - Este endpoint **não expõe dados sensíveis do usuário**, apenas identificador e papel no grupo.
+
+</details>
+
+<details>
 <summary><b>DELETE /groups/{id}/members/{user_id}</b> - Remove um membro do grupo </summary>
 
 - **Descrição:** Remove um usuário de um grupo específico. Apenas o **criador do grupo (owner)** ou um **administrador** podem executar esta operação.
@@ -923,6 +999,12 @@ ESTRUTURA PADRÃO DE CADA MÉTODO
     - Não é possível definir o papel como `member` através deste endpoint (rebaixamentos não são permitidos aqui).
     - O usuário alvo deve já ser membro do grupo.
 
+</details>
+
+## Endpoint de Imagens
+
+<details>
+<summary><b>GET /images/{filename}</b> - Busca uma imagem no servidor</summary>
 </details>
 
 ## WebHooks MQTT

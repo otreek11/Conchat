@@ -175,7 +175,7 @@ def get_user_by_username(username, token_payload):
         "created_at": user.registered_at.isoformat(),
         "pfp_url": user.pfp,
         "email": user.email,
-        "message": f"User {id} was found"
+        "message": f"User {username} was found"
     }
 
     requested_fields = request.args.get('fields')

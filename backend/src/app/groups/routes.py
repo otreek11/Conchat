@@ -60,7 +60,7 @@ def create_group(token_payload):
         db.session.rollback()
         logger.error(f"Error while creating group: {str(e)}")
         return jsonify({"message": "Internal server error"}), 500
-    
+
 
 @groups_bp.route("/<id>", methods=["DELETE"])
 @require_auth()
@@ -180,7 +180,6 @@ def update_group(id, token_payload):
 def add_group_member(id: str, token_payload):
     try:
         requester_id: str = token_payload.get("sub")
-        requester_role: str = token_payload.get("role")
 
         data = request.get_json()
         if not data:
@@ -203,32 +202,39 @@ def add_group_member(id: str, token_payload):
         if not user:
             return jsonify({"message": "User not found"}), 404
 
-        creator_relation = db.session.query(UserGroup).filter_by(
+        requester_relation = db.session.query(UserGroup).filter_by(
             group_id=group.id,
-            user_id=requester_id,
+            user_id=uuid.UUID(requester_id)
         ).first()
 
-        can_add = creator_relation and (creator_relation.role in ['admin', 'owner'])
-
-        if not can_add:
+        if not requester_relation or requester_relation.role not in ["owner", "admin"]:
             return jsonify({"message": "Forbidden"}), 403
 
         existing_relation = db.session.query(UserGroup).filter_by(
             group_id=group.id,
-            user_id=user_id
+            user_id=uuid.UUID(user_id)
         ).first()
 
         if existing_relation:
             return jsonify({"message": "User is already a member of this group"}), 409
 
-        user_group = UserGroup(
-            user_id=user_id,
-            group_id=group.id,
-            role=role
-        )
+        with db.session.begin():
+            members_count = db.session.query(UserGroup).filter_by(
+                group_id=group.id
+            ).with_for_update().count()
 
-        db.session.add(user_group)
-        db.session.commit()
+            if members_count >= group.max_users:
+                return jsonify({
+                    "message": f"This group has reached the maximum number of members ({group.max_users})"
+                }), 400
+
+            user_group = UserGroup(
+                user_id=uuid.UUID(user_id),
+                group_id=group.id,
+                role=role
+            )
+
+            db.session.add(user_group)
 
         logger.info(f"User {user_id} added to group {group.id} by {requester_id}")
 
@@ -395,4 +401,54 @@ def update_member_role(id, user_id, token_payload):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error while updating role for user {user_id} in group {id}: {str(e)}")
+        return jsonify({"message": "Internal server error"}), 500
+    
+@groups_bp.route("/<id>/members", methods=["GET"])
+@require_auth()
+def list_members(id, token_payload):
+    try:
+        requester_id = token_payload.get("sub")
+
+        group = db.session.get(Group, uuid.UUID(id))
+        if not group:
+            return jsonify({"message": "Group not found"}), 404
+
+        requester_relation = db.session.query(UserGroup).filter_by(
+            group_id=uuid.UUID(id),
+            user_id=uuid.UUID(requester_id)
+        ).first()
+
+        if not requester_relation:
+            return jsonify({"message": "You are not a member of this group"}), 403
+
+        role_filter = request.args.get("role")
+        query = db.session.query(UserGroup).filter_by(group_id=uuid.UUID(id))
+
+        if role_filter:
+            if role_filter not in ["owner", "admin", "member"]:
+                return jsonify({
+                    "message": "Invalid role filter. Allowed values are: owner, admin, member"
+                }), 400
+            query = query.filter_by(role=role_filter)
+
+        relations = query.all()
+
+        members = []
+        for rel in relations:
+            members.append({
+                "user_id": str(rel.user_id),
+                "role": rel.role,
+                "joined_at": rel.entered_at,
+            })
+
+        return jsonify({
+            "group_id": id,
+            "members": members
+        }), 200
+
+    except ValueError:
+        return jsonify({"message": "Invalid group id"}), 400
+
+    except Exception as e:
+        logger.error(f"Error while listing members of group {id}: {str(e)}")
         return jsonify({"message": "Internal server error"}), 500
