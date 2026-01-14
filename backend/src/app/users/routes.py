@@ -1,10 +1,10 @@
 from flask import Flask, Blueprint, request, jsonify
-from validate import *
-from schema import *
-from logger import logger
+from ...validate import *
+from ...schema import *
+from ...logger import logger
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import select, where, or_, and_
-from filehandling import *
+from sqlalchemy import select, or_, and_
+from ...filehandling import *
 from werkzeug.utils import secure_filename
 
 users_bp = Blueprint("Users Blueprint", __name__, url_prefix='/user')
