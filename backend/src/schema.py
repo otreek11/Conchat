@@ -34,15 +34,13 @@ class Group(db.Model):
     name = db.Column(db.String(80), nullable=False)
     registered_at = db.Column(DateTime(timezone=True), nullable=False, default=utc_now)
     icon = db.Column(db.Text, nullable=True)
+    max_users = db.Column(db.Integer, nullable=False, default=128)
 
     members = relationship("UserGroup", back_populates="group", cascade="all, delete-orphan")
 
-class Role(db.Model):
-    __tablename__ = "roles"
-
-    code = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String(80), nullable=False)
-    desc = db.Column(db.String(256), nullable=True)
+    __table_args__ = (
+        CheckConstraint('max_users BETWEEN 1 AND 128', name='ck_user_limit'),
+    )
 
 class UserGroup(db.Model):
     __tablename__ = "user_groups"
@@ -51,12 +49,16 @@ class UserGroup(db.Model):
     group_id = db.Column(db.UUID(as_uuid=True), db.ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True)
 
     entered_at = db.Column(DateTime(timezone=True), nullable=False, default=utc_now)
+
     
-    role_code = db.Column(db.Integer, db.ForeignKey("roles.code", ondelete="SET NULL"), nullable=True)
+    role = db.Column(db.String(16), nullable=False)
 
     user = relationship("User", back_populates="groups")
     group = relationship("Group", back_populates="members")
-    role = relationship("Role")
+
+    __table_args__ = (
+        Index('ix_gid', 'group_id'),
+    )
 
 class Admin(db.Model):
     __tablename__ = "admins"

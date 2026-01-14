@@ -124,6 +124,40 @@ def create_user():
         return jsonify({"message": "Internal server error"}), 500
 
 
+@users_bp.route('/id/<id>', methods=['GET'])
+@require_auth()
+def get_user_by_id(id, token_payload):
+    user = db.session.get(User, uuid.UUID(id))
+
+    if not user:
+        return jsonify({
+            "message": f"Could not find user '{id}'"
+        }), 404
+
+    response_data = {
+        "uuid": user.id,
+        "username": user.username,
+        "name": user.name,
+        "created_at": user.registered_at.isoformat(),
+        "pfp_url": user.pfp,
+        "email": user.email,
+        "message": f"User {id} was found"
+    }
+
+    requested_fields = request.args.get('fields')
+    
+    if requested_fields:
+        fields_list = [f.strip() for f in requested_fields.split(',')]
+        
+        filtered_response = {
+            k: v for k, v in response_data.items() if k in fields_list
+        }
+
+        if filtered_response:
+            return jsonify(filtered_response), 200
+
+    return jsonify(response_data), 200
+
 @users_bp.route('/<username>', methods=['GET'])
 @require_auth()
 def get_user_by_username(username, token_payload):
@@ -135,9 +169,10 @@ def get_user_by_username(username, token_payload):
         }), 404
 
     response_data = {
-        "uuid": user.uuid,
+        "uuid": user.id,
+        "username": user.username,
         "name": user.name,
-        "created_at": user.created_at.isoformat(),
+        "created_at": user.registered_at.isoformat(),
         "pfp_url": user.pfp,
         "email": user.email,
         "message": f"User {username} was found"

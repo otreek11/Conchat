@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import './Cadastro.css';
 
+<<<<<<< HEAD
 // ==================== CONFIGURAÇÃO DA API ====================
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+=======
+const BASE_URL = "http://localhost:8000/api/v1";
+>>>>>>> origin/main
 
 // ==================== INTERFACES E TIPOS ====================
 
@@ -330,16 +334,21 @@ function Cadastro() {
     formDataToSend.append('name', formData.name.trim());
     formDataToSend.append('email', formData.email.trim());
     formDataToSend.append('password', formData.password);
+    
     if (formData.pfp) {
       formDataToSend.append('pfp', formData.pfp);
     }
 
     try {
+<<<<<<< HEAD
       const url = `${API_BASE_URL}/api/v1/user/users`;
       console.log('Enviando requisição para:', url);
       console.log('API_BASE_URL:', API_BASE_URL);
 
       const response = await fetch(url, {
+=======
+      const response = await fetch(BASE_URL + "/users", {
+>>>>>>> origin/main
         method: 'POST',
         body: formDataToSend,
       });
