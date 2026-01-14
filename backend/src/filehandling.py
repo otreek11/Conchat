@@ -1,7 +1,7 @@
 import os
 import uuid
 from werkzeug.utils import secure_filename
-from .logger import logger
+from logger import logger
 
 UPLOAD_FOLDER = 'static/pfp'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
