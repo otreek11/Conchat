@@ -2,8 +2,8 @@ import os, uuid
 
 from flask import Flask, Blueprint, request, jsonify
 from dotenv import load_dotenv
-from schema import *
-from validate import *
+from ..schema import *
+from ..validate import *
 
 base_bp = Blueprint("Base API Blueprint", __name__, url_prefix="/api/v1")
 

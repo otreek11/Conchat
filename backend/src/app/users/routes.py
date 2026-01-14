@@ -1,7 +1,7 @@
 from flask import Flask, Blueprint, request, jsonify
-from validate import *
-from schema import *
-from logger import logger
+from ...validate import *
+from ...schema import *
+from ...logger import logger
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, or_, and_
 from filehandling import *
@@ -88,10 +88,10 @@ def create_user():
         
         new_user = User(
             username=username,
-            name=name, 
+            name=name,
             email=email,
             password=hashed_password,
-            profile_picture=pfp_filename
+            pfp=pfp_filename
         )
         
         db.session.add(new_user)
