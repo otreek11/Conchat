@@ -21,10 +21,12 @@ def init_app():
     from .auth import auth_bp
     from .users import users_bp
     from .admins import admins_bp
+    from .groups import groups_bp
 
     base_bp.register_blueprint(auth_bp)
     base_bp.register_blueprint(users_bp)
     base_bp.register_blueprint(admins_bp)
+    base_bp.register_blueprint(groups_bp)
     
     app.register_blueprint(base_bp)
 

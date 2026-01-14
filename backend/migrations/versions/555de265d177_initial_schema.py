@@ -1,8 +1,8 @@
 """Initial Schema
 
-Revision ID: 0615fbf634b8
+Revision ID: 555de265d177
 Revises: 
-Create Date: 2026-01-14 15:35:11.290798
+Create Date: 2026-01-14 16:13:30.269316
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '0615fbf634b8'
+revision = '555de265d177'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -24,12 +24,6 @@ def upgrade():
     sa.Column('registered_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('icon', sa.Text(), nullable=True),
     sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('roles',
-    sa.Column('code', sa.Integer(), autoincrement=True, nullable=False),
-    sa.Column('name', sa.String(length=80), nullable=False),
-    sa.Column('desc', sa.String(length=256), nullable=True),
-    sa.PrimaryKeyConstraint('code')
     )
     op.create_table('users',
     sa.Column('id', sa.UUID(), nullable=False),
@@ -86,9 +80,8 @@ def upgrade():
     sa.Column('user_id', sa.UUID(), nullable=False),
     sa.Column('group_id', sa.UUID(), nullable=False),
     sa.Column('entered_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('role_code', sa.Integer(), nullable=True),
+    sa.Column('role', sa.String(length=16), nullable=False),
     sa.ForeignKeyConstraint(['group_id'], ['groups.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['role_code'], ['roles.code'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('user_id', 'group_id')
     )
@@ -109,6 +102,5 @@ def downgrade():
     op.drop_table('blocks')
     op.drop_table('admins')
     op.drop_table('users')
-    op.drop_table('roles')
     op.drop_table('groups')
     # ### end Alembic commands ###
