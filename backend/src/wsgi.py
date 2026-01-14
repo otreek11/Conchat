@@ -11,5 +11,10 @@ def ping():
 logger.info("Initializing Server...")
 app = init_app()
 
+# Create database tables if they don't exist
+with app.app_context():
+    from schema import db
+    db.create_all()
+    logger.info("Database tables created/verified")
 
 logger.info("Server started!")
