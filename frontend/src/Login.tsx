@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import './Login.css';
 
+const BASE_URL = "http://localhost:8000/api/v1";
+
 // ==================== INTERFACES E TIPOS ====================
 
 interface LoginFormData {
@@ -156,11 +158,13 @@ function Login() {
     // Log para debug (roteamento será implementado futuramente)
     console.log('Login bem-sucedido!');
     console.log('Tokens salvos no localStorage');
+
+    console.log(data);
   };
 
   const submitLogin = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/v1/auth/login', {
+      const response = await fetch(BASE_URL + '/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import './Cadastro.css';
 
+const BASE_URL = "http://localhost:8000/api/v1";
+
 // ==================== INTERFACES E TIPOS ====================
 
 interface FormData {
@@ -326,12 +328,13 @@ function Cadastro() {
     formDataToSend.append('name', formData.name.trim());
     formDataToSend.append('email', formData.email.trim());
     formDataToSend.append('password', formData.password);
+    
     if (formData.pfp) {
       formDataToSend.append('pfp', formData.pfp);
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/v1/user/users', {
+      const response = await fetch(BASE_URL + "/users", {
         method: 'POST',
         body: formDataToSend,
       });

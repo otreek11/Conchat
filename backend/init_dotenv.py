@@ -3,7 +3,7 @@ from sys import argv, exit
 
 def dotenv_string(keylen=32, env="development", db_url="sqlite:///teste.db"):
     return f"""
-FLASK_APP=src/app.py
+FLASK_APP=src/wsgi:app
 FLASK_ENVIRONMENT={env}
 
 SECRET_KEY={secrets.token_urlsafe(keylen)}
