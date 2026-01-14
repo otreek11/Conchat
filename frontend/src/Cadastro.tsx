@@ -605,7 +605,7 @@ function Cadastro() {
 
         <footer className="cadastro-footer">
           <p>
-            Já tem uma conta? <a href="/login">Entrar</a>
+            Já tem uma conta? <a href="#login">Entrar</a>
           </p>
         </footer>
       </div>
