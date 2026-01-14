@@ -3,9 +3,9 @@ import uuid
 from werkzeug.utils import secure_filename
 from src.logger import logger
 
-UPLOAD_FOLDER = 'static/pfp'
+UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
-CDN_BASE_URL = "https://cdn.conchat.app/pfp/"
+CDN_BASE_URL = "https://localhost:8000/images/"
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -23,11 +23,7 @@ def save_file(file_obj, upload_folder):
         fname = "unknown"
         ext = "png"
 
-    fname = secure_filename(fname)
-    if not fname: 
-        fname = "file"
-
-    new_filename = f"{fname}_{uuid.uuid4().hex}.{ext.lower()}"
+    new_filename = secure_filename(f"{fname}_{uuid.uuid4().hex}") + f".{ext.lower()}"
     full_path = os.path.join(upload_folder, new_filename)
 
     file_obj.save(full_path)
