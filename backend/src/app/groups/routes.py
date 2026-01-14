@@ -16,10 +16,12 @@ def create_group(token_payload):
         name = request.form.get("name")
         icon_file = request.files.get("icon")
 
+        size = request.form.get("size", 128)
+
         if not name or not name.strip():
             return jsonify({"message": "'name' field must be provided!"}), 400
 
-        group = Group(name=name.strip())
+        group = Group(name=name.strip(), max_users=size)
 
         if icon_file:
             if not allowed_file(icon_file.filename):
