@@ -523,6 +523,408 @@ ESTRUTURA PADRÃO DE CADA MÉTODO
 
 ## Endpoints de Grupo
 
+<details>
+<summary><b>POST /groups</b> - Cria um grupo </summary>
+
+- **Descrição:** Cria um novo grupo no sistema e registra o usuário autenticado como criador do grupo
+- **Headers:**
+    - `Authorization:` Bearer `<token>`
+    - `Content-Type:` multipart/form-data
+- **Body:**
+    - `name` (string, required): o nome do grupo
+    - `icon` (file, optional): o ícone do grupo (png, jpg, jpeg, webp)
+- **Exemplo-Body:**
+    ```
+    ------SomeBoundary
+    Content-Disposition: form-data; name="name"
+
+    Amigos
+    ------SomeBoundary
+    Content-Disposition: form-data; name="icon"; filename="grupo.webp"
+    Content-Type: image/webp
+
+    (binary image content)
+    ------SomeBoundary--
+
+    ```
+- **Response:**
+    - `uuid` (string): o id público do grupo criado
+    - `name` (string): o nome do grupo
+    - `icon_url` (string): a url do local onde o ícone do grupo foi salvo
+    - `registered_at` (string): o horário de criação do grupo
+    - `message` (string): mensagem de confirmação
+- **Códigos:**
+    - `201` Created - Grupo criado com sucesso
+    - `400` Bad Request - Erro de validação (Campo obrigatório não-preenchido ou inválido)
+    - `401` Unauthorized - Token de autenticação ausente, inválido ou expirado
+- **Exemplo-Response: [201 Created]**
+    ```json
+    {
+        "uuid": "a3b6f5c2-0f3e-4b9d-9d1b-1c9c9f5b8a21",
+        "name": "Amigos",
+        "icon_url": "https://cdn.conchat.app/groups/icons/9s82ks7d.webp",
+        "registered_at": "2026-01-14T22:41:32Z",
+        "message": "Group was created successfully"
+    }
+    ```
+- **Exemplo-Response: [400 Bad Request]**
+    ```json
+    {
+        "message": "'name' field must be provided!"
+    }
+    ```
+- **Exemplo-Response: [401 Unauthorized]**
+    ```json
+    {
+        "message": "Unauthorized"
+    }
+    ```
+- **OBS.:**
+    - O campo `name` é obrigatório e não pode ser vazio
+    - O campo `icon` é opcional e aceita apenas arquivos de imagem (`png`, `jpg`, `jpeg`, `webp`)
+    - O campo `registered_at` é definido automaticamente pelo servidor no momento da criação
+    - O usuário autenticado que cria o grupo pode ser automaticamente associado como membro/administrador do grupo
+
+
+</details>
+
+<details>
+<summary><b>DELETE /groups/{id}</b> - Remove um grupo </summary>
+
+- **Descrição:** Remove permanentemente um grupo do sistema. Apenas o criador do grupo ou um usuário com permissão administrativa pode executar esta operação.
+
+- **Headers:**
+    - `Authorization:` Bearer `<token>`
+
+- **Parâmetros de Caminho:**
+    - `id` (string, required): o identificador único (UUID) do grupo a ser removido
+
+- **Response:**
+    - `message` (string): mensagem informando o resultado da operação
+
+- **Códigos:**
+    - `200` OK - Grupo removido com sucesso  
+    - `401` Unauthorized - Token de autenticação ausente, inválido ou expirado  
+    - `403` Forbidden - Usuário autenticado não possui permissão para deletar este grupo  
+    - `404` Not Found - Grupo não encontrado  
+    - `500` Internal Server Error - Erro interno ao tentar remover o grupo  
+
+- **Exemplo-Response: [200 OK]**
+    ```json
+    {
+        "message": "Group was deleted successfully"
+    }
+    ```
+
+- **Exemplo-Response: [404 Not Found]**
+    ```json
+    {
+        "message": "Group not found"
+    }
+    ```
+
+- **Exemplo-Response: [403 Forbidden]**
+    ```json
+    {
+        "message": "Forbidden"
+    }
+    ```
+
+- **OBS.:**
+    - Apenas o **criador do grupo** ou um **administrador** pode deletar o grupo.
+    - A exclusão do grupo remove automaticamente todas as relações de membros associadas (`cascade`).
+    - Caso o grupo possua um ícone salvo, o arquivo poderá ser removido do sistema após a exclusão.
+    - A operação é **irreversível**.
+
+</details>
+
+<details>
+<summary><b>PATCH /groups/{id}</b> - Atualiza dados de um grupo </summary>
+
+- **Descrição:** Atualiza parcialmente os dados de um grupo identificado pelo seu `id`. Apenas o **criador do grupo (owner)** ou um **administrador** podem executar esta operação.
+
+- **Headers:**
+    - `Authorization:` Bearer `<token>`
+    - `Content-Type:` multipart/form-data
+
+- **Parâmetros de Caminho:**
+    - `id` (string, required): o identificador único do grupo
+
+- **Body:**
+    - `name` (string, optional): novo nome do grupo  
+    - `icon` (file, optional): novo ícone do grupo (`png`, `jpg`, `jpeg`, `webp`)  
+
+- **Exemplo-Body:**
+    ```
+    ------SomeBoundary
+    Content-Disposition: form-data; name="name"
+
+    Novo Nome do Grupo
+    ------SomeBoundary
+    Content-Disposition: form-data; name="icon"; filename="novo_icone.webp"
+    Content-Type: image/webp
+
+    (binary image content)
+    ------SomeBoundary--
+    ```
+
+- **Response:**
+    - `uuid` (string): o id público do grupo
+    - `name` (string): o nome atualizado do grupo
+    - `icon_url` (string, nullable): a url do novo ícone do grupo
+    - `message` (string): mensagem informando o resultado da operação
+
+- **Códigos:**
+    - `200` OK - Grupo atualizado com sucesso  
+    - `400` Bad Request - Nenhum campo válido enviado ou dados inválidos  
+    - `401` Unauthorized - Token de autenticação ausente, inválido ou expirado  
+    - `403` Forbidden - Usuário não é o criador do grupo nem administrador  
+    - `404` Not Found - Grupo não encontrado  
+    - `500` Internal Server Error - Erro interno ao tentar atualizar o grupo  
+
+- **Exemplo-Response: [200 OK]**
+    ```json
+    {
+        "uuid": "a3b6f5c2-0f3e-4b9d-9d1b-1c9c9f5b8a21",
+        "name": "Novo Nome do Grupo",
+        "icon_url": "https://cdn.conchat.app/groups/icons/9s82ks7d.webp",
+        "message": "Group was updated successfully"
+    }
+    ```
+
+- **Exemplo-Response: [404 Not Found]**
+    ```json
+    {
+        "message": "Group not found"
+    }
+    ```
+
+- **Exemplo-Response: [403 Forbidden]**
+    ```json
+    {
+        "message": "Forbidden"
+    }
+    ```
+
+- **OBS.:**
+    - Apenas o **criador do grupo (owner)** ou um **administrador** pode atualizar os dados.
+    - É possível enviar apenas os campos que deseja alterar.
+    - Se nenhum campo válido for enviado, a API retornará `400 Bad Request`.
+    - O campo `icon` aceita apenas arquivos permitidos conforme as regras do backend (`allowed_file`).
+    - Caso um novo ícone seja enviado, o ícone antigo poderá ser removido do sistema após a atualização.
+
+</details>
+
+<details>
+<summary><b>POST /groups/{id}/members</b> - Adiciona um membro ao grupo </summary>
+
+- **Descrição:** Adiciona um usuário a um grupo existente. Apenas o **criador do grupo (owner)** ou um **administrador** pode executar esta operação.
+
+- **Headers:**
+    - `Authorization:` Bearer `<token>`
+    - `Content-Type:` application/json
+
+- **Parâmetros de Caminho:**
+    - `id` (string, required): o identificador único do grupo
+
+- **Body:**
+    - `user_id` (string, required): o identificador do usuário que será adicionado ao grupo
+    - `role` (string, optional): papel do usuário no grupo (`member`, `admin`)  
+      - Valor padrão: `member`
+
+- **Exemplo-Body:**
+    ```json
+    {
+        "user_id": "e52dd592-2b42-48ae-a9fd-8c8e9372b982",
+        "role": "member"
+    }
+    ```
+
+- **Response:**
+    - `group_id` (string): o id do grupo
+    - `user_id` (string): o id do usuário adicionado
+    - `role` (string): papel atribuído ao usuário
+    - `message` (string): mensagem de confirmação
+
+- **Códigos:**
+    - `201` Created - Usuário adicionado ao grupo com sucesso  
+    - `400` Bad Request - Campo obrigatório ausente ou inválido  
+    - `401` Unauthorized - Token de autenticação ausente, inválido ou expirado  
+    - `403` Forbidden - Usuário não é o criador do grupo nem administrador  
+    - `404` Not Found - Grupo ou usuário não encontrado  
+    - `409` Conflict - Usuário já é membro do grupo  
+    - `500` Internal Server Error - Erro interno ao tentar adicionar o usuário  
+
+- **Exemplo-Response: [201 Created]**
+    ```json
+    {
+        "group_id": "a3b6f5c2-0f3e-4b9d-9d1b-1c9c9f5b8a21",
+        "user_id": "e52dd592-2b42-48ae-a9fd-8c8e9372b982",
+        "role": "member",
+        "message": "User was added to group successfully"
+    }
+    ```
+
+- **Exemplo-Response: [404 Not Found]**
+    ```json
+    {
+        "message": "Group not found"
+    }
+    ```
+
+- **Exemplo-Response: [409 Conflict]**
+    ```json
+    {
+        "message": "User is already a member of this group"
+    }
+    ```
+
+- **OBS.:**
+    - Apenas o **criador do grupo (owner)** ou um **administrador** pode adicionar novos membros.
+    - O campo `role` é opcional e, se não informado, o usuário será adicionado como `member`.
+    - Um usuário não pode ser adicionado ao mesmo grupo mais de uma vez.
+    - O backend deve validar se o usuário informado existe antes de criar o vínculo.
+
+</details>
+
+<details>
+<summary><b>DELETE /groups/{id}/members/{user_id}</b> - Remove um membro do grupo </summary>
+
+- **Descrição:** Remove um usuário de um grupo específico. Apenas o **criador do grupo (owner)** ou um **administrador** podem executar esta operação.
+
+- **Headers:**
+    - `Authorization:` Bearer `<token>`
+
+- **Parâmetros de Caminho:**
+    - `id` (string, required): o identificador único do grupo  
+    - `user_id` (string, required): o identificador do usuário a ser removido do grupo  
+
+- **Body:**  
+    - Nenhum
+
+- **Response:**
+    - `group_id` (string): o id do grupo  
+    - `user_id` (string): o id do usuário removido  
+    - `message` (string): mensagem informando o resultado da operação  
+
+- **Códigos:**
+    - `200` OK - Usuário removido do grupo com sucesso  
+    - `401` Unauthorized - Token de autenticação ausente, inválido ou expirado  
+    - `403` Forbidden - Usuário não é o criador do grupo nem administrador  
+    - `404` Not Found - Grupo ou usuário não encontrado, ou usuário não pertence ao grupo  
+    - `500` Internal Server Error - Erro interno ao tentar remover o membro  
+
+- **Exemplo-Response: [200 OK]**
+    ```json
+    {
+        "group_id": "a3b6f5c2-0f3e-4b9d-9d1b-1c9c9f5b8a21",
+        "user_id": "e52dd592-2b42-48ae-a9fd-8c8e9372b982",
+        "message": "User was removed from group successfully"
+    }
+    ```
+
+- **Exemplo-Response: [404 Not Found]**
+    ```json
+    {
+        "message": "User is not a member of this group"
+    }
+    ```
+
+- **Exemplo-Response: [403 Forbidden]**
+    ```json
+    {
+        "message": "Forbidden"
+    }
+    ```
+
+- **OBS.:**
+    - Apenas o **criador do grupo (owner)** ou um **administrador** pode remover membros.
+    - Não é possível remover um usuário que não esteja associado ao grupo.
+    - A remoção apaga apenas o vínculo entre usuário e grupo (`UserGroup`), não exclui o usuário nem o grupo.
+    - Caso o usuário removido seja o próprio solicitante, isso pode ser tratado como **saída voluntária do grupo** (leave group), se desejado.
+
+</details>
+
+<details>
+<summary><b>PATCH /groups/{id}/members/{user_id}</b> - Atualiza o papel de um membro no grupo </summary>
+
+- **Descrição:** Atualiza o papel (`role`) de um usuário dentro de um grupo.  
+  Apenas o **criador do grupo (owner)** pode executar esta operação.
+
+- **Regras de Permissão:**
+    - O **owner** pode:
+        - Transferir a posse do grupo para outro usuário (novo `owner`)
+        - Tornar um `member` em `admin`
+    - O **admin** não pode alterar papéis
+    - Um **member** não pode alterar papéis
+
+- **Headers:**
+    - `Authorization:` Bearer `<token>`
+    - `Content-Type:` application/json
+
+- **Parâmetros de Caminho:**
+    - `id` (string, required): o identificador único do grupo  
+    - `user_id` (string, required): o identificador do usuário cujo papel será atualizado  
+
+- **Body:**
+    - `role` (string, required): novo papel do usuário no grupo  
+        - Valores aceitos: `owner`, `admin`
+
+- **Exemplo-Body:**
+    ```json
+    {
+        "role": "admin"
+    }
+    ```
+
+- **Response:**
+    - `group_id` (string): o id do grupo  
+    - `user_id` (string): o id do usuário atualizado  
+    - `role` (string): o novo papel atribuído ao usuário  
+    - `message` (string): mensagem informando o resultado da operação  
+
+- **Códigos:**
+    - `200` OK - Papel do usuário atualizado com sucesso  
+    - `400` Bad Request - Papel inválido ou campo obrigatório ausente  
+    - `401` Unauthorized - Token de autenticação ausente, inválido ou expirado  
+    - `403` Forbidden - Usuário autenticado não é o owner do grupo  
+    - `404` Not Found - Grupo ou usuário não encontrado, ou usuário não pertence ao grupo  
+    - `500` Internal Server Error - Erro interno ao tentar atualizar o papel do membro  
+
+- **Exemplo-Response: [200 OK]**
+    ```json
+    {
+        "group_id": "a3b6f5c2-0f3e-4b9d-9d1b-1c9c9f5b8a21",
+        "user_id": "e52dd592-2b42-48ae-a9fd-8c8e9372b982",
+        "role": "admin",
+        "message": "User role was updated successfully"
+    }
+    ```
+
+- **Exemplo-Response: [403 Forbidden]**
+    ```json
+    {
+        "message": "Only the group owner can update member roles"
+    }
+    ```
+
+- **Exemplo-Response: [400 Bad Request]**
+    ```json
+    {
+        "message": "Invalid role. Allowed values are: owner, admin"
+    }
+    ```
+
+- **OBS.:**
+    - Apenas o **owner** pode modificar papéis dentro do grupo.
+    - Ao definir `role = "owner"`, o usuário autenticado **deixa de ser owner** e o controle do grupo é transferido.
+    - `admin` **não pode promover, rebaixar ou transferir ownership**.
+    - `member` **não possui qualquer permissão administrativa**.
+    - Não é possível definir o papel como `member` através deste endpoint (rebaixamentos não são permitidos aqui).
+    - O usuário alvo deve já ser membro do grupo.
+
+</details>
+
 ## WebHooks MQTT
 
 O Broker EMQX utilizado para o sistema pub-sub permite a utilização de WebHooks para autorizar certas ações dentro do sistema, tais webhooks serão então implementados rodando um servidor Flask local (com URL base `http://127.0.0.1:5001/webhooks/v1`) para realizar as autorizações necessárias

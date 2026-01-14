@@ -37,13 +37,6 @@ class Group(db.Model):
 
     members = relationship("UserGroup", back_populates="group", cascade="all, delete-orphan")
 
-class Role(db.Model):
-    __tablename__ = "roles"
-
-    code = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String(80), nullable=False)
-    desc = db.Column(db.String(256), nullable=True)
-
 class UserGroup(db.Model):
     __tablename__ = "user_groups"
 
@@ -52,11 +45,10 @@ class UserGroup(db.Model):
 
     entered_at = db.Column(DateTime(timezone=True), nullable=False, default=utc_now)
     
-    role_code = db.Column(db.Integer, db.ForeignKey("roles.code", ondelete="SET NULL"), nullable=True)
+    role = db.Column(db.String(16), nullable=False)
 
     user = relationship("User", back_populates="groups")
     group = relationship("Group", back_populates="members")
-    role = relationship("Role")
 
 class Admin(db.Model):
     __tablename__ = "admins"
