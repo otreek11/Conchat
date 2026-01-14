@@ -1,5 +1,6 @@
 from .app import *
-from logger import logger
+from src.logger import logger
+from flask_cors import CORS
 
 @base_bp.route("/ping", methods = ["GET"])
 def ping():
@@ -9,7 +10,8 @@ def ping():
     }), 200
 
 logger.info("Initializing Server...")
-app = init_app()
 
+app = init_app()
+CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}})
 
 logger.info("Server started!")

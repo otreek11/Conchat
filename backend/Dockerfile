@@ -27,11 +27,8 @@ RUN pip install --upgrade pip setuptools wheel \
 # Copy application code
 COPY . .
 
-ENV PYTHONPATH=/app/src
-
-ENV FLASK_APP=src/app.py
-ENV FLASK_ENVIRONMENT=production
-
 EXPOSE 8000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "src.wsgi:app", "--workers", "3"]
+RUN chmod +x entrypoint.sh
+
+ENTRYPOINT ["./entrypoint.sh"]

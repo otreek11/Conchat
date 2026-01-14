@@ -3,10 +3,10 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from schema import *
+from src.schema import *
 from flask import jsonify, request
 from functools import wraps
-from logger import logger
+from src.logger import logger
 
 load_dotenv()
 
@@ -31,7 +31,10 @@ def require_auth(role = None):
                 return jsonify({"message": "Malformed authorization header"}), 400
 
             token = parts[1]
+            # logger.info(f"Attempting to decode token: {token}")
             payload = decode_jwt(token)
+            # logger.info(f"Decoded payload: {payload}")
+
             if payload is None: # Token invalido/expirado
                 return jsonify({"message": "Token is invalid/expired"}), 401
             
