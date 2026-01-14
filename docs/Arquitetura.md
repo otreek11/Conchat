@@ -193,6 +193,8 @@ ESTRUTURA PADRÃO DE CADA MÉTODO
 
 </details>
 
+
+
 ## Endpoints de Usuário
 
 <details>
@@ -336,7 +338,6 @@ ESTRUTURA PADRÃO DE CADA MÉTODO
     - `created_at` (string): a data de criação do usuário
     - `pfp_url` (string): o caminho para a foto de perfil do usuário
     - `email` (string): o email associado ao usuário
-    - `n_friends` (number): a quantidade de amigos do usuário
 - **Códigos:**
     - `200` OK - Usuário encontrado e informações retornadas
     - `404` Not Found - Usuário não está na base de dados
@@ -348,7 +349,6 @@ ESTRUTURA PADRÃO DE CADA MÉTODO
         "created_at": "2025-11-21T17:35:20Z",
         "pfp_url": "https://cdn.conchat.app/pfp/e7823sc6.webp",
         "email": "my@example.com",
-        "n_friends": 12,
         "message": "User example_username was found"
     }
     ```
@@ -405,6 +405,119 @@ ESTRUTURA PADRÃO DE CADA MÉTODO
 - **OBS.:**
     - Caso `fields` não seja especificado, retorna-se todos os campos
 
+
+</details>
+
+<details>
+<summary><b>DELETE /users/{id}</b> - Remove um usuário do sistema</summary>
+
+- **Descrição:**  Remove permanentemente um usuário identificado pelo seu `id`. Apenas usuários autorizados (administradores e o próprio usuário) podem executar esta operação.
+
+- **Parâmetros de Caminho:**
+    - `id` (string, **required**): Identificador único do usuário a ser removido.
+
+- **Headers:**
+    - `Authorization:` Bearer `<token>`
+    - `Content-Type:` application/json
+
+- **Response:**
+    - `message` (string): Mensagem informando o resultado da operação.
+
+- **Códigos:**
+    - `200` OK – Usuário removido com sucesso  
+    - `401` Unauthorized – Token ausente, inválido ou expirado  
+    - `403` Forbidden – Usuário autenticado não possui permissão para esta ação  
+    - `404` Not Found – Usuário não encontrado  
+    - `500` Internal Server Error – Erro interno ao tentar remover o usuário  
+
+- **Exemplo-Response: [200]**
+    ```json
+    {
+      "message": "User removed"
+    }
+    ```
+
+- **Exemplo-Response: [404]**
+    ```json
+    {
+      "message": "User not found"
+    }
+    ```
+
+</details>
+
+<details>
+<summary><b>PATCH /users/{id}</b> - Atualiza dados de um usuário</summary>
+
+- **Descrição:** Atualiza parcialmente os dados de um usuário identificado pelo seu `id`. Apenas o próprio usuário ou um administrador podem executar esta operação.
+
+- **Parâmetros de Caminho:**
+    - `id` (string, **required**): Identificador único do usuário a ser atualizado.
+
+- **Headers:**
+    - `Authorization:` Bearer `<token>`
+    - `Content-Type:` multipart/form-data
+
+- **Body:** 
+    - `username` (string, optional): Novo nome de usuário.  
+    - `name` (string, optional): Novo nome completo.  
+    - `email` (string, optional): Novo e-mail.  
+    - `password` (string, optional): Nova senha (mínimo 8 caracteres).  
+    - `pfp` (file, optional): Nova foto de perfil (imagem).
+
+- **Exemplo-Body:** 
+    ```
+    username=new_username
+    name=Novo Nome
+    email=novo@email.com
+    password=nova_senha_segura
+    pfp=@foto.png
+    ```
+
+- **Response:**
+    - `uuid` (string): Identificador do usuário.
+    - `pfp_url` (string, nullable): URL da nova foto de perfil.  
+    - `message` (string): Mensagem informando o resultado da operação.
+
+- **Códigos:**
+    - `200` OK – Usuário atualizado com sucesso  
+    - `400` Bad Request – Dados inválidos ou nenhum campo enviado  
+    - `401` Unauthorized – Token ausente, inválido ou expirado  
+    - `403` Forbidden – Usuário autenticado não possui permissão para esta ação  
+    - `404` Not Found – Usuário não encontrado  
+    - `409` Conflict – Username ou email já em uso  
+    - `500` Internal Server Error – Erro interno ao tentar atualizar o usuário  
+
+- **Exemplo-Response: [200]**
+    ```json
+    {
+      "uuid": "a1b2c3d4-e5f6-7890-abcd-1234567890ef",
+      "pfp_url": "https://cdn.conchat.com/foto12342143412.png",
+      "message": "User updated successfully"
+    }
+    ```
+
+- **Exemplo-Response: [404]**
+    ```json
+    {
+      "message": "User not found"
+    }
+    ```
+
+- **Exemplo-Response: [403]**
+    ```json
+    {
+      "message": "Forbidden"
+    }
+    ```
+
+- **OBS.:**
+    - Apenas o **próprio usuário** ou um **administrador** pode atualizar os dados.
+    - É possível enviar apenas os campos que deseja alterar.
+    - Campos presentes com `null` serão apagados (caso possivel), campos ausentes não serão modificados
+    - Caso `username` ou `email` já estejam em uso, a operação será rejeitada com `409 Conflict`.
+    - Se nenhum campo válido for enviado, a API retornará `400 Bad Request`.
+    - O campo `pfp` aceita apenas arquivos permitidos conforme as regras do backend (`allowed_file`).
 
 </details>
 
