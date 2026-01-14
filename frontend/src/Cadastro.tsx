@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import './Cadastro.css';
 
+// ==================== CONFIGURAÇÃO DA API ====================
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 // ==================== INTERFACES E TIPOS ====================
 
 interface FormData {
@@ -331,12 +335,18 @@ function Cadastro() {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/v1/user/users', {
+      const url = `${API_BASE_URL}/api/v1/user/users`;
+      console.log('Enviando requisição para:', url);
+      console.log('API_BASE_URL:', API_BASE_URL);
+
+      const response = await fetch(url, {
         method: 'POST',
         body: formDataToSend,
       });
 
+      console.log('Response status:', response.status);
       const data = await response.json();
+      console.log('Response data:', data);
 
       if (!response.ok) {
         handleApiError(response.status, data);
@@ -345,7 +355,8 @@ function Cadastro() {
 
       handleApiSuccess(data);
     } catch (error) {
-      console.error('Erro na requisição:', error);
+      console.error('Erro na requisição completo:', error);
+      console.error('Tipo do erro:', error instanceof TypeError ? 'TypeError (problema de rede/CORS)' : 'Outro erro');
       setErrors((prev) => ({
         ...prev,
         general: 'Erro ao conectar com o servidor. Tente novamente.',

@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import './Login.css';
 
+// ==================== CONFIGURAÇÃO DA API ====================
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 // ==================== INTERFACES E TIPOS ====================
 
 interface LoginFormData {
@@ -160,7 +164,7 @@ function Login() {
 
   const submitLogin = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/v1/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
