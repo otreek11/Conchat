@@ -26,4 +26,14 @@ def init_app():
     base_bp.register_blueprint(users_bp)
     base_bp.register_blueprint(admins_bp)
 
+    @base_bp.route("/ping", methods = ["GET"])
+    def ping():
+        return jsonify({
+            "message": "Servidor está ativo e funcional!",
+            "received_at": datetime.now(timezone.utc)
+        }), 200
+
+    
+    app.register_blueprint(base_bp)
+
     return app
