@@ -1,8 +1,8 @@
-"""empty message
+"""Initial Schema
 
-Revision ID: 476284b136dd
+Revision ID: ca94a4212d1d
 Revises: 
-Create Date: 2026-01-15 01:19:23.002417
+Create Date: 2026-01-15 12:33:33.250171
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '476284b136dd'
+revision = 'ca94a4212d1d'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -71,7 +71,7 @@ def upgrade():
     sa.Column('user_id', sa.UUID(), nullable=False),
     sa.Column('token_hash', sa.Text(), nullable=False),
     sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('is_valid', sa.BOOLEAN(), server_default=sa.text('(TRUE)'), nullable=False),
+    sa.Column('is_valid', sa.BOOLEAN(), server_default=sa.text('TRUE'), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('token_id')
     )
@@ -83,6 +83,7 @@ def upgrade():
     sa.Column('group_id', sa.UUID(), nullable=False),
     sa.Column('entered_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('role', sa.String(length=16), nullable=False),
+    sa.Column('invite_status', sa.Enum('PENDING', 'APPROVED', 'REJECTED', name='invite_status'), nullable=False),
     sa.ForeignKeyConstraint(['group_id'], ['groups.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('user_id', 'group_id')

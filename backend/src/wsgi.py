@@ -43,6 +43,7 @@ def mqtt_webhook_auth():
 logger.info("Initializing Server...")
 
 app = init_app()
-CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}})
+app.url_map.strict_slashes = False
+CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5173", "http://localhost:5174"]}})
 
 logger.info("Server started!")

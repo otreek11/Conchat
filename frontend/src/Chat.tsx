@@ -185,6 +185,9 @@ function Chat() {
     const key = `conchat_messages_${message.type}_${message.chatId}`;
     const existing = loadMessagesFromStorage(message.chatId, message.type);
 
+    const isDuplicate = existing.some((m: any) => m.uuid === message.uuid);
+    if (isDuplicate) return;
+
     const updated = [...existing, message];
     const limited = updated.slice(-500);
 

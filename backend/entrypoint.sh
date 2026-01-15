@@ -5,7 +5,7 @@ echo "Inicializando container..."
 # Gera .env apenas se não existir
 if [ ! -f .env ]; then
     echo "Gerando .env..."
-    python init_dotenv.py 32 development sqlite:///teste.db
+    python init_dotenv.py 32 development postgresql://user:password@db:5432/conchat_db
 else
     echo ".env encontrado, mantendo."
 fi

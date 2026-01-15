@@ -14,6 +14,18 @@ services:
     volumes:
       - emqx_data:/opt/emqx/data
 
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: conchat_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   # API RESTful
   backend:
     build:
@@ -25,12 +37,17 @@ services:
     env_file:
       - ./backend/.env
 
+    environment:
+      DATABASE_URL: postgresql://user:password@db:5432/conchat_db
+      
     volumes:
       - ./backend:/app
 
     restart: unless-stopped
     depends_on:
       - emqx
+      - db
 
 volumes:
   emqx_data:
+  postgres_data:

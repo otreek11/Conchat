@@ -43,6 +43,7 @@ def search_users(token_payload):
     users_list = []
 
     for user in results:
+        if user.id == uuid.UUID(token_payload['sub']): continue # Ignora a si mesmo
         pfp_filename = user.pfp
 
         users_list.append({
@@ -324,7 +325,7 @@ def get_user_groups(id, token_payload):
     if not user:
         return jsonify({"message": f"User {id} not found"}), 404
     
-    if user.id != token_payload['sub'] and token_payload['role'] != 'admin':
+    if user.id != uuid.UUID(token_payload['sub']) and token_payload['role'] != 'admin':
         return jsonify({"message": "Forbidden"}), 403
     relations = db.session.query(UserGroup).filter_by(user_id = uuid.UUID(id)).all()
 

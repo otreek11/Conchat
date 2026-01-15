@@ -13,15 +13,16 @@ def init_app():
 
     app = Flask(__name__)
 
-    # Configurar CORS para permitir requisições do frontend
-    CORS(app, resources={
-        r"/api/*": {
-            "origins": "*",
-            "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"],
-            "expose_headers": ["Content-Type", "Authorization"]
-        }
-    })
+    app.url_map.strict_slashes = False
+
+    # CORS(app, resources={
+    #     r"/api/*": {
+    #         "origins": "*",
+    #         "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    #         "allow_headers": ["Content-Type", "Authorization"],
+    #         "expose_headers": ["Content-Type", "Authorization"]
+    #     }
+    # })
 
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False

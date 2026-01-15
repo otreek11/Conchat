@@ -1,7 +1,7 @@
 import secrets
 from sys import argv, exit
 
-def dotenv_string(keylen=32, env="development", db_url="sqlite:///teste.db"):
+def dotenv_string(keylen=32, env="development", db_url="postgresql://user:password@db:5432/conchat_db"):
     return f"""
 FLASK_APP=src/wsgi:app
 FLASK_ENVIRONMENT={env}

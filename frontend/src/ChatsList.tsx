@@ -22,6 +22,8 @@ interface Friend {
   username: string;
   name: string;
   pfp_url?: string;
+  last_message_time?: string;
+  last_message_preview?: string; // Opcional: para mostrar prévia da msg
 }
 
 interface Group {
@@ -44,20 +46,11 @@ interface FriendRequest {
   created_at: string;
 }
 
-interface MqttFriendEvent {
-  type: 'FRIENDREQUEST_RECEIVED' | 'FRIENDSTATUS_UPDATE';
-  from: string;
-  payload: {
-    requester_id?: string;
-    requester_username?: string;
-    requester_name?: string;
-    requester_pfp_url?: string;
-    action?: 'accept' | 'reject';
-    user_id?: string;
-    username?: string;
-    name?: string;
-    pfp_url?: string;
-  };
+// Interface unificada para eventos MQTT
+interface MqttEvent {
+  type: 'FRIENDREQUEST_RECEIVED' | 'FRIENDSTATUS_UPDATE' | 'MESSAGE_NEW' | 'DM_MESSAGE';
+  from: string; // UUID de quem mandou
+  payload: any;
   timestamp: string;
 }
 
@@ -69,6 +62,9 @@ function ChatsList() {
   const [activeTab, setActiveTab] = useState<'friends' | 'groups'>('friends');
   const [friends, setFriends] = useState<Friend[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+
+  // Estado de Mensagens Não Lidas
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
   // Modais
   const [showSearchModal, setShowSearchModal] = useState(false);
@@ -116,7 +112,6 @@ function ChatsList() {
         return null;
       }
 
-      // Buscar UUID do usuário
       const meResponse = await fetch(`${API_BASE_URL}/auth/me`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -133,7 +128,6 @@ function ChatsList() {
       const meData = await meResponse.json();
       const userId = meData.uuid;
 
-      // Buscar dados completos do usuário
       const userResponse = await fetch(`${API_BASE_URL}/users/id/${userId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -170,7 +164,6 @@ function ChatsList() {
       const data = await response.json();
       const friendIds = data.friends || [];
 
-      // Buscar dados completos de cada amigo
       const friendsData = await Promise.all(
         friendIds.map(async (friendObj: { id: string }) => {
           const friendResponse = await fetch(
@@ -208,7 +201,6 @@ function ChatsList() {
       const data = await response.json();
       const groupIds = data.groups || [];
 
-      // Buscar dados completos de cada grupo
       const groupsData = await Promise.all(
         groupIds.map(async (groupObj: { id: string }) => {
           const groupResponse = await fetch(
@@ -254,75 +246,115 @@ function ChatsList() {
     }
   };
 
-  // ==================== MQTT ====================
+  // ==================== MQTT (CORE LOGIC) ====================
 
   const connectMQTT = (user: CurrentUser) => {
     try {
       const token = localStorage.getItem('access_token');
       if (!token) return;
 
+      // Usando ID fixo para garantir que mensagens pendentes cheguem
+      const clientId = `web_list_${user.uuid}`; 
+
       const client = mqtt.connect(MQTT_BROKER_URL, {
-        clientId: `web_${user.uuid}`,
-        username: user.username,
+        clientId: clientId,
+        username: user.uuid,
         password: token,
-        clean: false,
+        clean: false, // Sessão persistente
         keepalive: 60,
-        reconnectPeriod: 1000
+        reconnectPeriod: 2000
       });
 
       client.on('connect', () => {
-        console.log('MQTT connected');
-
-        // Subscrever ao tópico de notificações do usuário
-        const topic = `/users/${user.uuid}`;
-        client.subscribe(topic, { qos: 1 }, (err) => {
-          if (err) {
-            console.error('MQTT subscribe error:', err);
-          } else {
-            console.log(`Subscribed to ${topic}`);
-          }
-        });
+        console.log('MQTT Conectado na Lista');
+        const userTopic = `/users/${user.uuid}`;
+        const dmsTopic = `/dms/${user.uuid}`; // Escuta suas DMs
+        
+        client.subscribe([userTopic, dmsTopic], { qos: 1 });
       });
 
       client.on('message', (_topic: string, payload: Buffer) => {
         try {
-          const event: MqttFriendEvent = JSON.parse(payload.toString());
-          console.log('MQTT event received:', event);
+          const event: MqttEvent = JSON.parse(payload.toString());
+          
+          // Nova Mensagem Recebida
+          if (event.type === 'MESSAGE_NEW') {
+            const senderId = event.from;
+            const storageKey = `conchat_messages_dm_${senderId}`;
+            
+            const stored = localStorage.getItem(storageKey);
+            const existingMsgs = stored ? JSON.parse(stored) : [];
 
+            // Extrair dados
+            const msgId = event.payload.message_id;
+            const content = event.payload.content;
+
+            // Verificar duplicidade (Evitar salvar 2x a mesma msg)
+            const isDuplicate = existingMsgs.some((m: any) => m.uuid === msgId);
+
+            if (!isDuplicate && content) {
+                const newMessage = {
+                    uuid: msgId,
+                    chatId: senderId,
+                    type: 'dm',
+                    from: senderId,
+                    content: content,
+                    timestamp: event.timestamp,
+                    status: 'delivered' // Entregue, mas não lido (pois está na lista)
+                };
+
+                // Salvar
+                const updatedMsgs = [...existingMsgs, newMessage].slice(-500);
+                localStorage.setItem(storageKey, JSON.stringify(updatedMsgs));
+            }
+            // =========================================================
+
+
+            setUnreadCounts(prev => ({
+                ...prev,
+                [senderId]: (prev[senderId] || 0) + 1
+            }));
+
+            setFriends(prevFriends => {
+                const index = prevFriends.findIndex(f => f.uuid === senderId);
+                if (index > -1) {
+                    const newFriends = [...prevFriends];
+                    const [friend] = newFriends.splice(index, 1);
+                    if (event.payload?.content) {
+                        friend.last_message_preview = event.payload.content;
+                        // Atualiza timestamp visual também se quiser
+                        friend.last_message_time = event.timestamp; 
+                    }
+                    newFriends.unshift(friend);
+                    return newFriends;
+                }
+                return prevFriends;
+            });
+          }
+          
           if (event.type === 'FRIENDREQUEST_RECEIVED') {
-            // Novo convite de amizade recebido
-            setRequestsBadgeCount(prev => prev + 1);
-            setPendingRequests(prev => [...prev, {
-              requester_id: event.payload.requester_id!,
-              requester_username: event.payload.requester_username!,
-              requester_name: event.payload.requester_name!,
-              requester_pfp_url: event.payload.requester_pfp_url,
-              created_at: event.timestamp
-            }]);
+             setRequestsBadgeCount(prev => prev + 1);
+             setPendingRequests(prev => [...prev, {
+               requester_id: event.payload.requester_id!,
+               requester_username: event.payload.requester_username!,
+               requester_name: event.payload.requester_name!,
+               requester_pfp_url: event.payload.requester_pfp_url,
+               created_at: event.timestamp
+             }]);
           }
 
           if (event.type === 'FRIENDSTATUS_UPDATE') {
-            if (event.payload.action === 'accept') {
-              // Convite aceito - atualizar lista de amigos
-              if (user) {
-                fetchFriends(user.uuid);
-              }
-            }
+             if (event.payload.action === 'accept') {
+               if (user) fetchFriends(user.uuid);
+             }
           }
 
         } catch (err) {
-          console.error('Error processing MQTT message:', err);
+          console.error('Erro processando mensagem MQTT:', err);
         }
       });
-
-      client.on('error', (err) => {
-        console.error('MQTT error:', err);
-      });
-
-      client.on('close', () => {
-        console.log('MQTT disconnected');
-      });
-
+      
+      client.on('error', (err) => console.error('MQTT error:', err));
       setMqttClient(client);
 
     } catch (err) {
@@ -330,27 +362,22 @@ function ChatsList() {
     }
   };
 
-  // ==================== BUSCA DE USUÁRIOS ====================
+  // ==================== BUSCA E OUTROS ====================
 
   const searchUsers = async (query: string) => {
     if (query.length < 2) {
       setSearchResults([]);
       return;
     }
-
     setIsSearching(true);
-
     try {
       const response = await fetch(
         `${API_BASE_URL}/users?q=${encodeURIComponent(query)}`,
         { headers: getAuthHeaders() }
       );
-
       if (!response.ok) throw new Error('Search failed');
-
       const data = await response.json();
       setSearchResults(data.users || []);
-
     } catch (err) {
       console.error('Error searching users:', err);
       setSearchResults([]);
@@ -361,32 +388,40 @@ function ChatsList() {
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
-
-    // Debounce
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    searchTimeoutRef.current = setTimeout(() => {
-      searchUsers(value);
-    }, 500);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => searchUsers(value), 500);
   };
 
-  // ==================== CONVITES DE AMIZADE ====================
-
   const sendFriendRequest = async (targetId: string) => {
+    if (!currentUser) return;
+
     try {
+      // 1. Salva no Banco (REST)
       const response = await fetch(
         `${API_BASE_URL}/users/${targetId}/friends/request`,
-        {
-          method: 'POST',
-          headers: getAuthHeaders()
-        }
+        { method: 'POST', headers: getAuthHeaders() }
       );
-
       const data = await response.json();
-
+      
       if (response.ok) {
+        // Envia notificação MQTT manualmente para o alvo
+        if (mqttClient && mqttClient.connected) {
+            const eventPayload: MqttEvent = {
+                type: 'FRIENDREQUEST_RECEIVED',
+                from: currentUser.uuid,
+                timestamp: new Date().toISOString(),
+                payload: {
+                    requester_id: currentUser.uuid,
+                    requester_username: currentUser.username,
+                    requester_name: currentUser.name,
+                    requester_pfp_url: currentUser.pfp_url
+                }
+            };
+            // Publica no tópico DO OUTRO USUÁRIO
+            mqttClient.publish(`/users/${targetId}`, JSON.stringify(eventPayload), { qos: 1 });
+            console.log(`Notificação enviada via MQTT para ${targetId}`);
+        }
+
         alert('Convite enviado com sucesso!');
         setShowSearchModal(false);
         setSearchQuery('');
@@ -394,7 +429,6 @@ function ChatsList() {
       } else {
         alert(data.message || 'Erro ao enviar convite');
       }
-
     } catch (err) {
       console.error('Error sending friend request:', err);
       alert('Erro ao enviar convite');
@@ -402,7 +436,10 @@ function ChatsList() {
   };
 
   const respondToRequest = async (requesterId: string, action: 'accept' | 'reject') => {
+    if (!currentUser) return;
+
     try {
+      // 1. Salva no Banco (REST)
       const response = await fetch(
         `${API_BASE_URL}/users/${requesterId}/friends/request`,
         {
@@ -411,30 +448,41 @@ function ChatsList() {
           body: JSON.stringify({ action })
         }
       );
-
       const data = await response.json();
 
       if (response.ok) {
-        // Remover da lista de pendentes
-        setPendingRequests(prev =>
-          prev.filter(r => r.requester_id !== requesterId)
-        );
+        // Atualiza UI local
+        setPendingRequests(prev => prev.filter(r => r.requester_id !== requesterId));
         setRequestsBadgeCount(prev => Math.max(0, prev - 1));
 
         if (action === 'accept') {
-          // Atualizar lista de amigos
-          if (currentUser) {
-            fetchFriends(currentUser.uuid);
+          fetchFriends(currentUser.uuid);
+          
+          // Avisa o outro usuário via MQTT que aceitamos
+          if (mqttClient && mqttClient.connected) {
+            const eventPayload: MqttEvent = {
+                type: 'FRIENDSTATUS_UPDATE',
+                from: currentUser.uuid,
+                timestamp: new Date().toISOString(),
+                payload: {
+                    action: 'accept',
+                    user_id: currentUser.uuid, // Quem aceitou (eu)
+                    username: currentUser.username,
+                    name: currentUser.name,
+                    pfp_url: currentUser.pfp_url
+                }
+            };
+            // Publica no tópico do AMIGO
+            mqttClient.publish(`/users/${requesterId}`, JSON.stringify(eventPayload), { qos: 1 });
           }
+          
           alert('Convite aceito!');
         } else {
           alert('Convite recusado');
         }
-
       } else {
         alert(data.message || 'Erro ao responder convite');
       }
-
     } catch (err) {
       console.error('Error responding to friend request:', err);
       alert('Erro ao responder convite');
@@ -443,19 +491,16 @@ function ChatsList() {
 
   // ==================== NAVEGAÇÃO ====================
 
-  const openChat = (
-    type: 'dm' | 'group',
-    chatId: string,
-    chatName: string,
-    chatIcon?: string
-  ) => {
+  const openChat = (type: 'dm' | 'group', chatId: string, chatName: string, chatIcon?: string) => {
+    // Ao abrir o chat, zeramos o contador de não lidas visualmente
+    setUnreadCounts(prev => ({ ...prev, [chatId]: 0 }));
+
     const params = new URLSearchParams({
       type,
       chatId,
       chatName,
       ...(chatIcon && { chatIcon })
     });
-
     window.location.hash = `chat?${params.toString()}`;
   };
 
@@ -464,37 +509,27 @@ function ChatsList() {
   useEffect(() => {
     const initializeData = async () => {
       setIsLoading(true);
-
       const user = await fetchCurrentUser();
       if (!user) {
         setIsLoading(false);
         return;
       }
-
       await Promise.all([
         fetchFriends(user.uuid),
         fetchGroups(user.uuid),
         fetchPendingRequests(user.uuid)
       ]);
-
       connectMQTT(user);
-
       setIsLoading(false);
     };
 
     initializeData();
 
     return () => {
-      if (mqttClient) {
-        mqttClient.end();
-      }
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
+      if (mqttClient) mqttClient.end();
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     };
   }, []);
-
-  // ==================== RENDER ====================
 
   if (isLoading) {
     return (
@@ -505,9 +540,7 @@ function ChatsList() {
     );
   }
 
-  if (!currentUser) {
-    return null;
-  }
+  if (!currentUser) return null;
 
   return (
     <div className="chats-container">
@@ -525,20 +558,12 @@ function ChatsList() {
           </div>
         </div>
         <div className="header-right">
-          <button
-            className="header-btn"
-            onClick={() => setShowSearchModal(true)}
-          >
-            + Adicionar Amigo
+          <button className="header-btn" onClick={() => setShowSearchModal(true)}>
+            + Adicionar
           </button>
-          <button
-            className="header-btn"
-            onClick={() => setShowRequestsModal(true)}
-          >
+          <button className="header-btn" onClick={() => setShowRequestsModal(true)}>
             Convites
-            {requestsBadgeCount > 0 && (
-              <span className="badge">{requestsBadgeCount}</span>
-            )}
+            {requestsBadgeCount > 0 && <span className="badge">{requestsBadgeCount}</span>}
           </button>
         </div>
       </div>
@@ -547,12 +572,7 @@ function ChatsList() {
       {error && (
         <div className="error-banner">
           <span className="error-message">{error}</span>
-          <button
-            className="close-error-btn"
-            onClick={() => setError(null)}
-          >
-            ×
-          </button>
+          <button className="close-error-btn" onClick={() => setError(null)}>×</button>
         </div>
       )}
 
@@ -588,8 +608,20 @@ function ChatsList() {
                   className="chat-item-avatar"
                 />
                 <div className="chat-item-info">
-                  <p className="chat-item-name">{friend.name}</p>
-                  <p className="chat-item-username">@{friend.username}</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                        <p className="chat-item-name">{friend.name}</p>
+                        {/* BADGE DE NÃO LIDAS */}
+                        {unreadCounts[friend.uuid] > 0 && (
+                            <span className="unread-badge">
+                                {unreadCounts[friend.uuid]}
+                            </span>
+                        )}
+                    </div>
+                  <p className="chat-item-username">
+                      {friend.last_message_preview 
+                        ? friend.last_message_preview 
+                        : `@${friend.username}`}
+                  </p>
                 </div>
               </div>
             ))
@@ -622,7 +654,7 @@ function ChatsList() {
             <div className="empty-state">
               <div className="empty-state-icon">👥</div>
               <h3>Nenhum grupo ainda</h3>
-              <p>Entre em grupos para conversar com várias pessoas!</p>
+              <p>Entre em grupos para conversar!</p>
             </div>
           )
         )}
@@ -634,12 +666,7 @@ function ChatsList() {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">Buscar Usuários</h3>
-              <button
-                className="modal-close-btn"
-                onClick={() => setShowSearchModal(false)}
-              >
-                ×
-              </button>
+              <button className="modal-close-btn" onClick={() => setShowSearchModal(false)}>×</button>
             </div>
             <div className="modal-body">
               <input
@@ -650,7 +677,6 @@ function ChatsList() {
                 onChange={(e) => handleSearchChange(e.target.value)}
                 autoFocus
               />
-
               {isSearching ? (
                 <div className="search-empty">Buscando...</div>
               ) : searchResults.length > 0 ? (
@@ -665,10 +691,7 @@ function ChatsList() {
                         />
                         <span className="search-result-username">@{user.username}</span>
                       </div>
-                      <button
-                        className="add-friend-btn"
-                        onClick={() => sendFriendRequest(user.uuid)}
-                      >
+                      <button className="add-friend-btn" onClick={() => sendFriendRequest(user.uuid)}>
                         Adicionar
                       </button>
                     </div>
@@ -688,12 +711,7 @@ function ChatsList() {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">Convites de Amizade</h3>
-              <button
-                className="modal-close-btn"
-                onClick={() => setShowRequestsModal(false)}
-              >
-                ×
-              </button>
+              <button className="modal-close-btn" onClick={() => setShowRequestsModal(false)}>×</button>
             </div>
             <div className="modal-body">
               {pendingRequests.length > 0 ? (
@@ -711,18 +729,8 @@ function ChatsList() {
                       </div>
                     </div>
                     <div className="request-actions">
-                      <button
-                        className="accept-btn"
-                        onClick={() => respondToRequest(request.requester_id, 'accept')}
-                      >
-                        Aceitar
-                      </button>
-                      <button
-                        className="reject-btn"
-                        onClick={() => respondToRequest(request.requester_id, 'reject')}
-                      >
-                        Recusar
-                      </button>
+                      <button className="accept-btn" onClick={() => respondToRequest(request.requester_id, 'accept')}>Aceitar</button>
+                      <button className="reject-btn" onClick={() => respondToRequest(request.requester_id, 'reject')}>Recusar</button>
                     </div>
                   </div>
                 ))

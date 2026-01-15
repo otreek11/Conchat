@@ -17,7 +17,7 @@ def login():
     if not username or not senha:
         return jsonify({"message": "'username' and 'password' are required"}), 400
     
-    user = User.query.filter_by(username=username).first()
+    user = db.session.query(User).filter_by(username=username).first()
     if user is None:
         return jsonify({"message": "Wrong credentials"}), 401
     
