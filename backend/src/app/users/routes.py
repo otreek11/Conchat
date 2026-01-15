@@ -321,7 +321,7 @@ def get_user_groups(id, token_payload):
         return jsonify({"message": f"User {id} not found"}), 404
     
     if user.id != token_payload['sub'] and token_payload['role'] != 'admin':
-        return jsonify({"message": "Forbidden"}), 203
+        return jsonify({"message": "Forbidden"}), 403
     relations = db.session.query(UserGroup).filter_by(user_id = uuid.UUID(id)).all()
 
     x = []
@@ -335,4 +335,131 @@ def get_user_groups(id, token_payload):
     return jsonify({
         "message": f"{len(x)} groups found",
         "groups": x,
+    }), 200
+
+@users_bp.route('/<id>/friends', methods=["GET"])
+@require_auth()
+def get_user_friends(id, token_payload):
+
+    user = db.session.get(User, uuid.UUID(id))
+    if not user:
+        return jsonify({"message": f"User {id} not found"}), 404
+    
+    if user.id != uuid.UUID(token_payload['sub']) and token_payload['role'] != 'admin':
+        return jsonify({"message": "Forbidden"}), 403
+    
+    uid = uuid.UUID(id)
+    stmt = select(Friendship).where(
+        and_(
+            or_(
+                Friendship.addressee_id == uid, 
+                Friendship.requester_id == uid
+            ),
+            Friendship.status == FriendshipStatus.APPROVED
+        )
+    )
+
+    relations = db.session.execute(stmt).scalars().all()
+
+    x = []
+    for r in relations:
+        x.append({
+            "id": r.requester_id if r.addressee_id == uid else r.addressee_id
+        })
+    
+    return jsonify({
+        "message": f"{len(x)} friends found",
+        "friends": x,
+    }), 200
+
+@users_bp.route('/<target_id>/friends/request', methods=['POST'])
+@require_auth()
+def send_friend_request(target_id, token_payload):
+    requester_id = uuid.UUID(token_payload['sub'])
+    
+    try:
+        addressee_id = uuid.UUID(target_id)
+    except ValueError:
+        return jsonify({"message": "Invalid Target UUID"}), 400
+
+    if requester_id == addressee_id:
+        return jsonify({"message": "You cannot friend yourself"}), 400
+
+    target_user = db.session.get(User, addressee_id)
+    if not target_user:
+        return jsonify({"message": "User not found"}), 404
+
+    existing_friendship = Friendship.get_between(requester_id, addressee_id)
+
+    if existing_friendship:
+        if existing_friendship.status == FriendshipStatus.APPROVED:
+            return jsonify({"message": "Already friends"}), 409
+        
+        if existing_friendship.status == FriendshipStatus.PENDING:
+            if existing_friendship.requester_id == requester_id:
+                return jsonify({"message": "Request already sent"}), 409
+            else:
+                return jsonify({"message": "This user already sent you a request. Accept it instead."}), 409
+        
+        if existing_friendship.status == FriendshipStatus.REJECTED:
+            if existing_friendship.requester_id != requester_id:
+                db.session.delete(existing_friendship)
+                db.session.flush()
+            else:
+
+                existing_friendship.status = FriendshipStatus.PENDING
+                existing_friendship.created_at = utc_now()
+                db.session.commit()
+                return jsonify({"message": "Friend request resent"}), 200
+
+    new_friendship = Friendship(
+        requester_id=requester_id,
+        addressee_id=addressee_id,
+        status=FriendshipStatus.PENDING
+    )
+
+    db.session.add(new_friendship)
+    db.session.commit()
+
+    return jsonify({"message": "Friend request sent successfully"}), 201
+
+@users_bp.route('/<requester_id>/friends/request', methods=['PATCH'])
+@require_auth()
+def respond_friend_request(requester_id, token_payload):
+    my_id = uuid.UUID(token_payload['sub'])
+    
+    try:
+        req_id = uuid.UUID(requester_id)
+    except ValueError:
+        return jsonify({"message": "Invalid Requester UUID"}), 400
+
+    data = request.get_json()
+    action = data.get('action')
+
+    if action not in ['accept', 'reject']:
+        return jsonify({"message": "Action must be 'accept' or 'reject'"}), 400
+
+    friendship = db.session.query(Friendship).filter_by(
+        requester_id=req_id,
+        addressee_id=my_id
+    ).first()
+
+    if not friendship:
+        return jsonify({"message": "Friend request not found"}), 404
+
+    if friendship.status != FriendshipStatus.PENDING:
+        return jsonify({"message": f"This request is already {friendship.status.value}"}), 409
+
+    if action == 'accept':
+        friendship.status = FriendshipStatus.APPROVED
+        msg = "Friend request accepted"
+    else:
+        friendship.status = FriendshipStatus.REJECTED
+        msg = "Friend request rejected"
+
+    db.session.commit()
+
+    return jsonify({
+        "message": msg,
+        "current_status": friendship.status.value
     }), 200
