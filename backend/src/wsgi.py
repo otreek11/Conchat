@@ -16,7 +16,7 @@ app = init_app()
 CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}})
 # Create database tables if they don't exist
 with app.app_context():
-    from schema import db
+    from src.schema import db
     db.create_all()
     logger.info("Database tables created/verified")
     
