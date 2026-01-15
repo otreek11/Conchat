@@ -10,10 +10,12 @@ images_bp = Blueprint("Images Blueprint", __name__, url_prefix="/images")
 
 @images_bp.route("/<filename>", methods=["GET"])
 def get_file(filename):
+
     safe_name = secure_filename(filename)
-    folder = os.path.join(BASE_STATIC_PATH, "pfp")
+    folder = os.path.join(BASE_STATIC_PATH, "uploads")
 
     file_path = os.path.join(folder, safe_name)
+    logger.info(f"Attempt to load file: {file_path}")
     if not os.path.exists(file_path):
         abort(404)
 
