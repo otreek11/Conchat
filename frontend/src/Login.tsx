@@ -155,11 +155,16 @@ function Login() {
     setTouched(new Set());
     setErrors({});
 
-    // Log para debug (roteamento será implementado futuramente)
+    // Log para debug
     console.log('Login bem-sucedido!');
     console.log('Tokens salvos no localStorage');
-
     console.log(data);
+
+    // Redirecionar para a lista de chats após u
+    // m breve delay
+    setTimeout(() => {
+      window.location.hash = '#chats';
+    }, 1000);
   };
 
   const submitLogin = async () => {

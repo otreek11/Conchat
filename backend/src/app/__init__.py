@@ -1,6 +1,7 @@
 import os, uuid
 
 from flask import Flask, Blueprint, request, jsonify
+from flask_cors import CORS
 from dotenv import load_dotenv
 from src.schema import *
 from src.validate import *
@@ -9,8 +10,11 @@ base_bp = Blueprint("Base API Blueprint", __name__, url_prefix="/api/v1")
 
 def init_app():
     load_dotenv()
-    
+
     app = Flask(__name__)
+
+    # Configurar CORS para permitir requisições do frontend
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
 
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
