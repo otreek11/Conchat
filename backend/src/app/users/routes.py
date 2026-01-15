@@ -321,7 +321,7 @@ def get_user_groups(id, token_payload):
         return jsonify({"message": f"User {id} not found"}), 404
     
     if user.id != token_payload['sub'] and token_payload['role'] != 'admin':
-        return jsonify({"message": "Forbidden"}), 203
+        return jsonify({"message": "Forbidden"}), 403
     relations = db.session.query(UserGroup).filter_by(user_id = uuid.UUID(id)).all()
 
     x = []
@@ -335,4 +335,39 @@ def get_user_groups(id, token_payload):
     return jsonify({
         "message": f"{len(x)} groups found",
         "groups": x,
+    }), 200
+
+@users_bp.route('/<id>/friends', methods=["GET"])
+@require_auth()
+def get_user_friends(id, token_payload):
+
+    user = db.session.get(User, uuid.UUID(id))
+    if not user:
+        return jsonify({"message": f"User {id} not found"}), 404
+    
+    if user.id != uuid.UUID(token_payload['sub']) and token_payload['role'] != 'admin':
+        return jsonify({"message": "Forbidden"}), 403
+    
+    uid = uuid.UUID(id)
+    stmt = select(Friendship).where(
+        and_(
+            or_(
+                Friendship.addressee_id == uid, 
+                Friendship.requester_id == uid
+            ),
+            Friendship.status == 'accepted'
+        )
+    )
+
+    relations = db.session.execute(stmt).scalars().all()
+
+    x = []
+    for r in relations:
+        x.append({
+            "id": r.requester_id if r.addressee_id == uid else r.addressee_id
+        })
+    
+    return jsonify({
+        "message": f"{len(x)} friends found",
+        "friends": x,
     }), 200
