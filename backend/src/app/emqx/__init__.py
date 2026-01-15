@@ -1,1 +1,1 @@
-from .emqx_service import *
+# EMQX MQTT integration module

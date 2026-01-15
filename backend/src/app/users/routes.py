@@ -30,10 +30,14 @@ def search_users(token_payload):
 
     offset = (page - 1) * limit
 
-    stmt = select(User).where(User.name.ilike(f"%{q}%")) \
-        .offset(offset) \
-        .limit(limit)
-    
+    # Buscar por username OU name
+    stmt = select(User).where(
+        or_(
+            User.username.ilike(f"%{q}%"),
+            User.name.ilike(f"%{q}%")
+        )
+    ).offset(offset).limit(limit)
+
     results = db.session.execute(stmt).scalars().all()
 
     users_list = []
@@ -421,6 +425,25 @@ def send_friend_request(target_id, token_payload):
     db.session.add(new_friendship)
     db.session.commit()
 
+    # Publicar evento MQTT para notificar o destinatário
+    try:
+        from src.app.emqx.mqtt_publisher import MQTTPublisher
+
+        requester = db.session.get(User, requester_id)
+        MQTTPublisher.publish_event(
+            topic=f"/users/{str(addressee_id)}",
+            event_type="FRIENDREQUEST_RECEIVED",
+            from_user_id=requester_id,
+            payload={
+                "requester_id": str(requester_id),
+                "requester_username": requester.username,
+                "requester_name": requester.name,
+                "requester_pfp_url": requester.pfp
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error publishing MQTT event: {e}")
+
     return jsonify({"message": "Friend request sent successfully"}), 201
 
 @users_bp.route('/<requester_id>/friends/request', methods=['PATCH'])
@@ -459,7 +482,65 @@ def respond_friend_request(requester_id, token_payload):
 
     db.session.commit()
 
+    # Publicar evento MQTT para notificar o remetente original
+    try:
+        from src.app.emqx.mqtt_publisher import MQTTPublisher
+
+        my_user = db.session.get(User, my_id)
+        MQTTPublisher.publish_event(
+            topic=f"/users/{str(req_id)}",
+            event_type="FRIENDSTATUS_UPDATE",
+            from_user_id=my_id,
+            payload={
+                "action": action,
+                "user_id": str(my_id),
+                "username": my_user.username,
+                "name": my_user.name,
+                "pfp_url": my_user.pfp
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error publishing MQTT event: {e}")
+
     return jsonify({
         "message": msg,
         "current_status": friendship.status.value
+    }), 200
+
+@users_bp.route('/<id>/friends/requests/pending', methods=['GET'])
+@require_auth()
+def get_pending_requests(id, token_payload):
+    """Lista convites de amizade pendentes recebidos pelo usuário"""
+    user = db.session.get(User, uuid.UUID(id))
+    if not user:
+        return jsonify({"message": f"User {id} not found"}), 404
+
+    if user.id != uuid.UUID(token_payload['sub']) and token_payload['role'] != 'admin':
+        return jsonify({"message": "Forbidden"}), 403
+
+    uid = uuid.UUID(id)
+    stmt = select(Friendship).where(
+        and_(
+            Friendship.addressee_id == uid,
+            Friendship.status == FriendshipStatus.PENDING
+        )
+    )
+
+    requests = db.session.execute(stmt).scalars().all()
+
+    result = []
+    for req in requests:
+        requester = db.session.get(User, req.requester_id)
+        if requester:
+            result.append({
+                "requester_id": str(requester.id),
+                "requester_username": requester.username,
+                "requester_name": requester.name,
+                "requester_pfp_url": requester.pfp,
+                "created_at": req.created_at.isoformat()
+            })
+
+    return jsonify({
+        "message": f"{len(result)} pending requests found",
+        "requests": result
     }), 200
