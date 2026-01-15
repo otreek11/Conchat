@@ -1,36 +1,32 @@
 version: '3.8'
 
 services:
-
   emqx:
     image: emqx/emqx:5.0.26
-    container_name: emqx_conchat
+    container_name: emqx_conchat_prod
     ports:
       - "1883:1883"
       - "8083:8083"
       - "18083:18083"
     environment:
-      - "EMQX_ALLOW_ANONYMOUS=true"
+      - "EMQX_ALLOW_ANONYMOUS=false" 
     volumes:
-      - emqx_data:/opt/emqx/data
+      - emqx_data_prod:/opt/emqx/data
+    restart: always
 
-  # API RESTful
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: conchat_backend
+    container_name: conchat_backend_prod
     ports:
       - "8000:8000"
     env_file:
-      - ./backend/.env
-
-    volumes:
-      - ./backend:/app
-
-    restart: unless-stopped
+      - ./backend/.env.prod
+    
+    restart: always
     depends_on:
       - emqx
 
 volumes:
-  emqx_data:
+  emqx_data_prod:

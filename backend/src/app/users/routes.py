@@ -311,3 +311,28 @@ def update_user(id, token_payload):
 
         logger.error(f"Error while updating user {id}: {str(e)}")
         return jsonify({"message": "Internal server error"}), 500
+    
+@users_bp.route('/<id>/groups', methods=["GET"])
+@require_auth()
+def get_user_groups(id, token_payload):
+
+    user = db.session.get(User, uuid.UUID(id))
+    if not user:
+        return jsonify({"message": f"User {id} not found"}), 404
+    
+    if user.id != token_payload['sub'] and token_payload['role'] != 'admin':
+        return jsonify({"message": "Forbidden"}), 203
+    relations = db.session.query(UserGroup).filter_by(user_id = uuid.UUID(id)).all()
+
+    x = []
+    for r in relations:
+        x.append({
+            "id": str(r.group_id),
+            "joined_at": r.entered_at,
+            "role": r.role,
+        })
+    
+    return jsonify({
+        "message": f"{len(x)} groups found",
+        "groups": x,
+    }), 200
