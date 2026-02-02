@@ -339,7 +339,9 @@ function Cadastro() {
         body: formDataToSend,
       });
 
+      console.log('Response status:', response.status);
       const data = await response.json();
+      console.log('Response data:', data);
 
       if (!response.ok) {
         handleApiError(response.status, data);
@@ -348,7 +350,8 @@ function Cadastro() {
 
       handleApiSuccess(data);
     } catch (error) {
-      console.error('Erro na requisição:', error);
+      console.error('Erro na requisição completo:', error);
+      console.error('Tipo do erro:', error instanceof TypeError ? 'TypeError (problema de rede/CORS)' : 'Outro erro');
       setErrors((prev) => ({
         ...prev,
         general: 'Erro ao conectar com o servidor. Tente novamente.',
