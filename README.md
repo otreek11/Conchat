@@ -3,8 +3,8 @@
 <!-- TODO: Colocar ícone aqui quando tivermos um -->
 
 ![status](https://img.shields.io/badge/status-desenvolvimento-yellow)
+![versão](https://img.shields.io/badge/versão-0.1.0-yellow)
 ![license](https://img.shields.io/badge/licença-MPL_2.0-green)
-![versão](https://img.shields.io/badge/versão-nenhuma-red)
 
 Aplicativo de comunicação em tempo real distribuído centrado na facilidade de conexão, interação humana e segurança.
 
