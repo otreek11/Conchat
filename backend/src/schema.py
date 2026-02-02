@@ -42,6 +42,20 @@ class Group(db.Model):
         CheckConstraint('max_users BETWEEN 1 AND 128', name='ck_user_limit'),
     )
 
+
+class Admin(db.Model):
+    __tablename__ = "admins"
+
+    id = db.Column(db.UUID(as_uuid=True), db.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    registered_at = db.Column(DateTime(timezone=True), nullable=False, default=utc_now)
+    
+    user = relationship("User", back_populates="admin_profile")
+
+class FriendshipStatus(enum.Enum):
+    PENDING = "Pending"
+    APPROVED = "Approved"
+    REJECTED = "Rejected"
+
 class UserGroup(db.Model):
     __tablename__ = "user_groups"
 
@@ -56,22 +70,15 @@ class UserGroup(db.Model):
     user = relationship("User", back_populates="groups")
     group = relationship("Group", back_populates="members")
 
+    invite_status = db.Column(
+        SQLEnum(FriendshipStatus, name="invite_status"), 
+        nullable=False,
+        default=FriendshipStatus.PENDING,
+    )
+
     __table_args__ = (
         Index('ix_gid', 'group_id'),
     )
-
-class Admin(db.Model):
-    __tablename__ = "admins"
-
-    id = db.Column(db.UUID(as_uuid=True), db.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    registered_at = db.Column(DateTime(timezone=True), nullable=False, default=utc_now)
-    
-    user = relationship("User", back_populates="admin_profile")
-
-class FriendshipStatus(enum.Enum):
-    PENDING = "Pending"
-    APPROVED = "Approved"
-    REJECTED = "Rejected"
 
 class Friendship(db.Model):
     __tablename__ = "friendships"

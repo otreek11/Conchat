@@ -437,6 +437,7 @@ def list_members(id, token_payload):
 
         members = []
         for rel in relations:
+            if rel.invite_status != FriendshipStatus.APPROVED: continue
             members.append({
                 "user_id": str(rel.user_id),
                 "role": rel.role,
@@ -453,4 +454,140 @@ def list_members(id, token_payload):
 
     except Exception as e:
         logger.error(f"Error while listing members of group {id}: {str(e)}")
+        return jsonify({"message": "Internal server error"}), 500
+    
+@groups_bp.route("/<id>/invites", methods=["POST"])
+@require_auth()
+def invite_user_to_group(id, token_payload):
+    try:
+        requester_id = token_payload.get("sub")
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"message": "Request body must be JSON"}), 400
+            
+        target_user_id = data.get("user_id")
+        role_to_give = data.get("role", "member") 
+
+        if not target_user_id:
+            return jsonify({"message": "'user_id' is required"}), 400
+
+        group = db.session.get(Group, uuid.UUID(id))
+        if not group:
+            return jsonify({"message": "Group not found"}), 404
+
+        target_user = db.session.get(User, uuid.UUID(target_user_id))
+        if not target_user:
+            return jsonify({"message": "User to invite not found"}), 404
+
+        requester_relation = db.session.query(UserGroup).filter_by(
+            group_id=group.id,
+            user_id=uuid.UUID(requester_id)
+        ).first()
+
+        if (not requester_relation or 
+            requester_relation.invite_status != FriendshipStatus.APPROVED or 
+            requester_relation.role not in ["owner", "admin"]):
+            return jsonify({"message": "Forbidden: You don't have permission to invite users"}), 403
+
+        existing_relation = db.session.query(UserGroup).filter_by(
+            group_id=group.id,
+            user_id=target_user.id
+        ).first()
+
+        if existing_relation:
+            if existing_relation.invite_status == FriendshipStatus.APPROVED:
+                return jsonify({"message": "User is already a member"}), 409
+            elif existing_relation.invite_status == FriendshipStatus.PENDING:
+                return jsonify({"message": "User already has a pending invite"}), 409
+
+        occupied_slots = db.session.query(UserGroup).filter(
+            UserGroup.group_id == group.id,
+            UserGroup.invite_status.in_([
+                FriendshipStatus.APPROVED, 
+                FriendshipStatus.PENDING
+            ])
+        ).count()
+
+        if occupied_slots >= group.max_users:
+             return jsonify({
+                 "message": f"Group capacity reached ({group.max_users}). Pending invites also count as occupied slots."
+             }), 400
+
+        if existing_relation:
+            existing_relation.invite_status = FriendshipStatus.PENDING
+            existing_relation.role = role_to_give
+            existing_relation.entered_at = utc_now()
+        else:
+            new_invite = UserGroup(
+                user_id=target_user.id,
+                group_id=group.id,
+                role=role_to_give,
+                invite_status=FriendshipStatus.PENDING
+            )
+            db.session.add(new_invite)
+
+        db.session.commit()
+        logger.info(f"User {target_user_id} invited to group {id} by {requester_id}")
+
+        return jsonify({
+            "message": "Invite sent successfully",
+            "group_id": str(group.id),
+            "user_id": str(target_user.id),
+            "status": "Pending"
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error inviting user to group: {e}")
+        return jsonify({"message": "Internal server error"}), 500
+    
+@groups_bp.route("/<id>/invites/accept", methods=["PATCH"])
+@require_auth()
+def accept_group_invite(id, token_payload):
+    try:
+        user_id = token_payload.get("sub")
+
+        data = request.get_json()
+        action = data.get("action")
+        if not action:
+            return jsonify({"message": "'action' must be provided"}), 400
+        
+        if action not in ['accept', 'reject']:
+            return jsonify({"message": "Invalid action"}), 400
+
+        group = db.session.get(Group, uuid.UUID(id))
+        if not group:
+            return jsonify({"message": "Group not found"}), 404
+
+        relation = db.session.query(UserGroup).filter_by(
+            group_id=group.id,
+            user_id=uuid.UUID(user_id)
+        ).first()
+
+        if not relation:
+            return jsonify({"message": "No invite found for this group"}), 404
+        
+        if relation.invite_status == FriendshipStatus.APPROVED:
+            return jsonify({"message": "You are already a member of this group"}), 409 # Conflict
+
+        if relation.invite_status != FriendshipStatus.PENDING:
+            return jsonify({"message": "No valid pending invite found"}), 400
+
+        relation.invite_status = FriendshipStatus.APPROVED if action == 'accept' else FriendshipStatus.REJECTED
+        relation.entered_at = utc_now()
+
+        db.session.commit()
+
+        logger.info(f"User {user_id} accepted invite to group {id}")
+
+        return jsonify({
+            "message": "Action done succesfully",
+            "group_id": str(group.id),
+            "role": relation.role,
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error accepting invite: {e}")
         return jsonify({"message": "Internal server error"}), 500
